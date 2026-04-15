@@ -28,10 +28,10 @@ import {
 
 // 초기 NPC 데이터 구성 (특기 및 미디어 역할군 부여)
 const initialNPCs = [
-  { id: 1, name: '박팀장', role: 'Project Manager', specialty: 'text', model: 'gpt-4o', persona: '당신은 10년 차 IT 프로젝트 매니저입니다. 항상 일정을 준수하고 명확하게 소통합니다.', x: 20, y: 30, color: 'bg-blue-500', icon: FileText, status: '프로젝트 기획안 작성 중' },
-  { id: 2, name: '김개발', role: 'Software Engineer', specialty: 'code', model: 'claude-3-5-sonnet', persona: '당신은 시니어 프론트엔드 개발자입니다. 클린 코드와 성능 최적화를 중요하게 생각합니다.', x: 60, y: 25, color: 'bg-green-500', icon: Code, status: '핵심 로직 구현 중' },
-  { id: 3, name: '이픽셀', role: 'UI/UX Designer', specialty: 'image', model: 'dall-e-3', persona: '당신은 트렌디한 감각을 지닌 UI/UX 디자이너입니다. 사용자 경험을 최우선으로 고려합니다.', x: 75, y: 65, color: 'bg-purple-500', icon: Palette, status: '브랜드 로고 디자인 구상 중' },
-  { id: 4, name: '강무비', role: 'Video Creator', specialty: 'video', model: 'sora', persona: '당신은 감각적인 영상 편집자입니다. 시선을 사로잡는 트랜지션과 효과를 잘 사용합니다.', x: 30, y: 70, color: 'bg-rose-500', icon: Video, status: '홍보 영상 렌더링 준비 중' },
+  { id: 1, name: '박팀장', role: 'Project Manager', specialty: 'text', model: 'gpt-4o', apiKey: '', persona: '당신은 10년 차 IT 프로젝트 매니저입니다. 항상 일정을 준수하고 명확하게 소통합니다.', x: 20, y: 30, color: 'bg-blue-500', icon: FileText, status: '프로젝트 기획안 작성 중' },
+  { id: 2, name: '김개발', role: 'Software Engineer', specialty: 'code', model: 'claude-3-5-sonnet', apiKey: '', persona: '당신은 시니어 프론트엔드 개발자입니다. 클린 코드와 성능 최적화를 중요하게 생각합니다.', x: 60, y: 25, color: 'bg-green-500', icon: Code, status: '핵심 로직 구현 중' },
+  { id: 3, name: '이픽셀', role: 'UI/UX Designer', specialty: 'image', model: 'dall-e-3', apiKey: '', persona: '당신은 트렌디한 감각을 지닌 UI/UX 디자이너입니다. 사용자 경험을 최우선으로 고려합니다.', x: 75, y: 65, color: 'bg-purple-500', icon: Palette, status: '브랜드 로고 디자인 구상 중' },
+  { id: 4, name: '강무비', role: 'Video Creator', specialty: 'video', model: 'sora', apiKey: '', persona: '당신은 감각적인 영상 편집자입니다. 시선을 사로잡는 트랜지션과 효과를 잘 사용합니다.', x: 30, y: 70, color: 'bg-rose-500', icon: Video, status: '홍보 영상 렌더링 준비 중' },
 ];
 
 // 무작위로 변경될 상태 메시지 목록
@@ -205,6 +205,20 @@ export default function DevSim() {
     setGeneratingMessage('');
   };
 
+  // 테스트 명령어 핸들러
+  const handleTestCommand = () => {
+    setToastMessage('🚀 테스트 명령어가 실행되었습니다!');
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+    
+    setNpcs((currentNpcs) => currentNpcs.map((npc) => ({
+      ...npc,
+      x: Math.max(10, Math.min(90, Math.random() * 100)),
+      y: Math.max(10, Math.min(90, Math.random() * 100)),
+      status: '테스트 명령어 실행 중 🛠️'
+    })));
+  };
+
   // 선택된 NPC 찾기
   const selectedNPC = npcs.find(npc => npc.id === selectedId);
 
@@ -231,10 +245,10 @@ export default function DevSim() {
         output = { type: 'code', content: 'function initAI() {\n  return "System Ready";\n}' };
       }
     } else if (npc.specialty === 'image') {
-      // API 키 확인 (Image 전용 키가 없으면 LLM 키를 폴백으로 사용)
-      const apiKey = apiKeys.image || apiKeys.llm; 
+      // 개별 API 키 우선 적용, 없으면 전역 Image 키, 없으면 전역 LLM 키 사용
+      const apiKey = npc.apiKey || apiKeys.image || apiKeys.llm; 
       if (!apiKey) {
-        alert('API 키가 설정되지 않았습니다. Control Panel의 열쇠 아이콘을 눌러 키를 입력해주세요.');
+        alert('API 키가 설정되지 않았습니다. 전역 API 키 또는 에이전트 개별 API 키를 설정해주세요.');
         setGeneratingId(null);
         return;
       }
@@ -364,6 +378,48 @@ export default function DevSim() {
 
   return (
     <div className="flex h-screen w-full bg-slate-900 text-slate-200 font-sans relative">
+      {/* API 키 설정 모달 */}
+      {showApiModal && (
+        <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl border border-slate-700 p-8 m-4">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-white flex items-center gap-3"><Key className="w-6 h-6 text-yellow-400" /> API 키 설정</h3>
+              <button onClick={() => setShowApiModal(false)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-slate-400">LLM API Key (OpenAI, Claude, Gemini 등)</label>
+                <input 
+                  type="password"
+                  value={apiKeys.llm}
+                  onChange={(e) => setApiKeys({...apiKeys, llm: e.target.value})}
+                  className="mt-1 w-full bg-slate-900 text-white border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
+                  placeholder="sk-..."
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-400">Image Generation API Key (DALL-E 등)</label>
+                <input 
+                  type="password"
+                  value={apiKeys.image}
+                  onChange={(e) => setApiKeys({...apiKeys, image: e.target.value})}
+                  className="mt-1 w-full bg-slate-900 text-white border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
+                  placeholder="LLM 키와 동일하면 비워두세요"
+                />
+              </div>
+            </div>
+            <div className="mt-8 flex justify-end gap-3">
+              <button onClick={() => setShowApiModal(false)} className="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg transition-colors">취소</button>
+              <button onClick={() => { handleSaveKeys(); setShowApiModal(false); }} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-colors flex items-center gap-2">
+                <Save className="w-4 h-4" /> 저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 글로벌 토스트 알림 */}
       {showToast && (
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 animate-bounce border border-indigo-400">
@@ -401,9 +457,10 @@ export default function DevSim() {
                 style={{ 
                   left: `${npc.x}%`, 
                   top: `${npc.y}%`,
-                  transition: 'left 3s ease-in-out, top 3s ease-in-out' // 위치 이동 시 부드러운 전환 효과
+                  transition: draggingId === npc.id ? 'none' : 'left 3s ease-in-out, top 3s ease-in-out' // 드래그 중에는 애니메이션 제거
                 }}
                 onClick={() => setSelectedId(npc.id)}
+                onMouseDown={(e) => handleMouseDown(e, npc.id)}
               >
                 {/* 프로그레스 바 (작업 렌더링 중) */}
                 {generatingId === npc.id && (
@@ -471,11 +528,30 @@ export default function DevSim() {
                 )}
 
                 {/* 이름표 (Name Tag) */}
-                <div className={`mb-2 px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap shadow-lg transition-all duration-300 ${
+                <div 
+                  className={`mb-2 px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap shadow-lg transition-all duration-300 ${
                   isSelected 
                     ? 'bg-white text-slate-900 scale-110' 
                     : 'bg-slate-700 text-white opacity-80 group-hover:opacity-100 group-hover:-translate-y-1 border border-slate-600'
-                }`}>
+                }`}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    const newName = prompt('NPC의 새로운 이름을 입력하세요:', npc.name);
+                    if (newName && newName.trim()) {
+                      const updatedNpcs = npcs.map(n => n.id === npc.id ? { ...n, name: newName.trim() } : n);
+                      setNpcs(updatedNpcs);
+                      if (editingAgent && editingAgent.id === npc.id) {
+                        setEditingAgent({ ...editingAgent, name: newName.trim() });
+                      }
+                      const toSave = updatedNpcs.map(({ icon, ...rest }) => rest);
+                      localStorage.setItem('devsim_agents', JSON.stringify(toSave));
+                      setToastMessage('이름이 변경되었습니다 ✨');
+                      setShowToast(true);
+                      setTimeout(() => setShowToast(false), 3000);
+                    }
+                  }}
+                  title="더블클릭하여 이름 변경"
+                >
                   {npc.name}
                 </div>
                 
@@ -506,6 +582,13 @@ export default function DevSim() {
             <h2 className="text-xl font-bold text-white tracking-wide">Control Panel</h2>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={handleTestCommand}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+              title="Test Command"
+            >
+              <Terminal className="w-5 h-5" />
+            </button>
             <button onClick={() => setShowApiModal(true)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors" title="API Settings">
               <Key className="w-5 h-5" />
             </button>
@@ -565,7 +648,13 @@ export default function DevSim() {
                     <input 
                       type="text" 
                       value={editingAgent.name} 
-                      onChange={(e) => setEditingAgent({...editingAgent, name: e.target.value})}
+                      onChange={(e) => {
+                        const newName = e.target.value;
+                        setEditingAgent({...editingAgent, name: newName});
+                        setNpcs(currentNpcs => 
+                          currentNpcs.map(n => n.id === editingAgent.id ? { ...n, name: newName } : n)
+                        );
+                      }}
                       className="w-full bg-slate-800 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
                     />
                   </div>
@@ -573,35 +662,37 @@ export default function DevSim() {
                   {/* 역할 */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5"/> 역할 (Role)</label>
-                    <select 
-                      value={editingAgent.role}
+                    <input 
+                      type="text"
+                      value={editingAgent.role} 
                       onChange={(e) => setEditingAgent({...editingAgent, role: e.target.value})}
                       className="w-full bg-slate-800 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
-                    >
-                      <option value="Project Manager">Project Manager</option>
-                      <option value="Software Engineer">Software Engineer</option>
-                      <option value="UI/UX Designer">UI/UX Designer</option>
-                      <option value="Video Creator">Video Creator</option>
-                      <option value="Prompt Engineer">Prompt Engineer</option>
-                      <option value="Data Scientist">Data Scientist</option>
-                    </select>
+                      placeholder="예: Software Engineer"
+                    />
                   </div>
 
                   {/* API 모델 */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Bot className="w-3.5 h-3.5"/> AI 모델</label>
-                    <select 
-                      value={editingAgent.model}
+                    <input 
+                      type="text"
+                      value={editingAgent.model} 
                       onChange={(e) => setEditingAgent({...editingAgent, model: e.target.value})}
                       className="w-full bg-slate-800 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
-                    >
-                      <option value="gpt-4o">GPT-4o (OpenAI)</option>
-                      <option value="gpt-4-turbo">GPT-4 Turbo (OpenAI)</option>
-                      <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Anthropic)</option>
-                      <option value="gemini-1.5-pro">Gemini 1.5 Pro (Google)</option>
-                      <option value="dall-e-3">DALL-E 3 (Image)</option>
-                      <option value="sora">Sora (Video)</option>
-                    </select>
+                      placeholder="예: gpt-4o"
+                    />
+                  </div>
+
+                  {/* 개별 API 키 (선택사항) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Key className="w-3.5 h-3.5"/> 개별 API Key (선택사항)</label>
+                    <input 
+                      type="password"
+                      value={editingAgent.apiKey || ''} 
+                      onChange={(e) => setEditingAgent({...editingAgent, apiKey: e.target.value})}
+                      className="w-full bg-slate-900 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
+                      placeholder="비워두면 전역 키를 사용합니다"
+                    />
                   </div>
 
                   {/* 페르소나 (시스템 프롬프트) */}
