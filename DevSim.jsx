@@ -30,6 +30,9 @@ import {
   Send,
   Grid,
   Sparkles
+  Sparkles,
+  Pause,
+  FileDown
 } from 'lucide-react';
 
 // 초기 NPC 데이터 구성 (특기 및 미디어 역할군 부여)
@@ -81,6 +84,7 @@ export default function DevSim() {
   const [activeConnection, setActiveConnection] = useState(null); // 에이전트 간 협업 시각화를 위한 연결 상태
   const [viewingImage, setViewingImage] = useState(null);
   const [viewingVideo, setViewingVideo] = useState(null);
+  const [isPaused, setIsPaused] = useState(false);
 
   // 에이전트 커스터마이징을 위한 State
   const [editingAgent, setEditingAgent] = useState(null);
@@ -262,6 +266,8 @@ export default function DevSim() {
 
   // 무작위 이동을 위한 Effect Hook
   useEffect(() => {
+    if (isPaused) return; // 일시정지 상태면 이동 로직 건너뜀
+
     const interval = setInterval(() => {
       setNpcs((currentNpcs) =>
         currentNpcs.map((npc) => {
@@ -286,6 +292,7 @@ export default function DevSim() {
 
     return () => clearInterval(interval);
   }, []);
+  }, [isPaused]);
 
   const handleReset = () => {
     if (shoutTimeoutRef.current) clearTimeout(shoutTimeoutRef.current);
@@ -315,6 +322,49 @@ export default function DevSim() {
       y: Math.max(10, Math.min(90, Math.random() * 100)),
       status: '테스트 명령어 실행 중 🛠️'
     })));
+  };
+
+  // 프로젝트 결과물 통합 익스포트 (Markdown)
+  const handleExportProject = () => {
+    if (Object.keys(mediaOutputs).length === 0) {
+      setToastMessage('내보낼 결과물이 없습니다. 먼저 작업을 실행해주세요! 😅');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      return;
+    }
+
+    let markdown = `# 🚀 DevSim Project Report\n\n**생성 일시:** ${new Date().toLocaleString()}\n\n---\n\n`;
+
+    npcs.forEach(npc => {
+      const output = mediaOutputs[npc.id];
+      if (output) {
+        markdown += `## 🧑‍💻 [${npc.role}] ${npc.name}의 작업물\n\n`;
+        if (output.type === 'text') {
+          markdown += `${output.content}\n\n`;
+        } else if (output.type === 'code') {
+          markdown += \`\`\`javascript\n${output.content}\n\`\`\`\n\n\`;
+        } else if (output.type === 'image') {
+          markdown += `!Generated Image\n\n`;
+        } else if (output.type === 'video') {
+          markdown += `🎥 비디오 결과물 링크 (클릭하여 확인)\n\n`;
+        }
+        markdown += `---\n\n`;
+      }
+    });
+
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `DevSim_Project_${new Date().toISOString().replace(/[:.]/g, '-')}.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setToastMessage('프로젝트 리포트가 다운로드되었습니다 📝');
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
   };
 
   // 선택된 NPC 찾기
@@ -478,6 +528,68 @@ export default function DevSim() {
     // API를 호출하지 않는 영상 작업만 기존처럼 2.5초 지연을 두어 시뮬레이션
     if (npc.specialty === 'video') {
       await new Promise(resolve => setTimeout(resolve, 2500));
+      try {
+        const apiKey = npc.apiKey || apiKeys.video || apiKeys.llm;
+        if (!apiKey) {
+          alert('Video API 키가 설정되지 않았습니다. 설정 모달에서 Video API 키를 입력해주세요.');
+          setGeneratingId(null);
+          setActiveConnection(null);
+          return;
+        }
+
+        // Luma AI (Dream Machine) REST API 연동
+        const requestBody = {
+          prompt: "High quality, cinematic, 4k resolution, smooth motion"
+        };
+        
+        // 이픽셀의 결과물(이미지)가 있으면 Image-to-Video 프롬프트로 구성
+        if (mediaOutputs[3]) {
+          requestBody.keyframes = {
+            frame0: { type: "image", url: mediaOutputs[3].content }
+          };
+          requestBody.prompt = "Animate this image with cinematic camera pan, high quality";
+        }
+
+        const createRes = await fetch('https://api.lumalabs.ai/dream-machine/v1/generations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!createRes.ok) throw new Error('Video API 요청 실패');
+        const createData = await createRes.json();
+        let videoUrl = null;
+
+        // 영상 생성이 완료될 때까지 상태 확인 (Polling)
+        while (true) {
+          await new Promise(resolve => setTimeout(resolve, 5000)); // 5초 대기 후 재확인
+          
+          const pollRes = await fetch(`https://api.lumalabs.ai/dream-machine/v1/generations/${createData.id}`, {
+            headers: { 'Authorization': `Bearer ${apiKey}` }
+          });
+          const pollData = await pollRes.json();
+          
+          if (pollData.state === 'completed') {
+            videoUrl = pollData.assets.video;
+            break;
+          } else if (pollData.state === 'failed') {
+            throw new Error('비디오 생성 실패 (API 내부 오류)');
+          }
+          
+          // 진행 상태 업데이트 (대기 중, 렌더링 중 등)
+          setGeneratingMessage(`영상 렌더링 중... (${pollData.state}) 🎬`);
+        }
+        output = { type: 'video', content: videoUrl };
+      } catch (error) {
+        console.error('Video API Error:', error);
+        alert(`영상 생성 실패: ${error.message}`);
+        setGeneratingId(null);
+        setActiveConnection(null);
+        return;
+      }
     }
 
     setGeneratingId(null);
@@ -729,6 +841,17 @@ export default function DevSim() {
                   placeholder="LLM 키와 동일하면 비워두세요"
                 />
                 <p className="text-xs text-slate-500 ml-1">DALL-E 3 등 이미지 렌더링을 위한 전용 키 (선택)</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-300 flex items-center gap-2"><Video className="w-4 h-4 text-purple-400" /> Video Generation API Key</label>
+                <input 
+                  type="password"
+                  value={apiKeys.video || ''}
+                  onChange={(e) => setApiKeys({...apiKeys, video: e.target.value})}
+                  className="w-full bg-slate-900/50 text-white border border-slate-600 rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all shadow-inner placeholder:text-slate-600"
+                  placeholder="Luma AI 또는 Runway API 키 입력 (선택)"
+                />
+                <p className="text-xs text-slate-500 ml-1">Luma AI 등 비디오 렌더링을 위한 전용 키</p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-300 flex items-center gap-2"><Send className="w-4 h-4 text-cyan-400" /> Slack Webhook URL (선택)</label>
@@ -1051,6 +1174,20 @@ export default function DevSim() {
             <h2 className="text-xl font-bold text-white tracking-wide">Control Panel</h2>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={handleExportProject}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+              title="프로젝트 결과물 통합 다운로드 (Markdown)"
+            >
+              <FileDown className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setIsPaused(!isPaused)}
+              className={`p-2 rounded-lg transition-colors ${isPaused ? 'text-indigo-400 bg-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
+              title={isPaused ? "에이전트 이동 재개" : "에이전트 이동 일시정지 (Freeze)"}
+            >
+              {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+            </button>
             <button
               onClick={handleAddAgent}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
