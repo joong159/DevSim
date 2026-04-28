@@ -29,34 +29,35 @@ import {
   UserPlus,
   Send,
   Grid,
-  Sparkles
   Sparkles,
   Pause,
-  FileDown
+  FileDown,
+  BrainCircuit,
+  LayoutList,
+  ThumbsUp,
+  ThumbsDown,
+  MessageCircle
 } from 'lucide-react';
+import { callLLM, callImageGen } from './api';
+import { sendToSlack, sendToDiscord } from './webhook';
 
 // 초기 NPC 데이터 구성 (특기 및 미디어 역할군 부여)
 const initialNPCs = [
-  { id: 1, name: '박팀장', role: 'Project Manager', specialty: 'text', model: 'gpt-4o', apiKey: '', persona: '당신은 10년 차 IT 프로젝트 매니저입니다. 항상 일정을 준수하고 명확하게 소통합니다.', x: 20, y: 30, color: 'bg-blue-500', icon: FileText, status: '프로젝트 기획안 작성 중' },
-  { id: 2, name: '김개발', role: 'Software Engineer', specialty: 'code', model: 'claude-3-5-sonnet', apiKey: '', persona: '당신은 시니어 프론트엔드 개발자입니다. 클린 코드와 성능 최적화를 중요하게 생각합니다.', x: 60, y: 25, color: 'bg-green-500', icon: Code, status: '핵심 로직 구현 중' },
-  { id: 3, name: '이픽셀', role: 'UI/UX Designer', specialty: 'image', model: 'dall-e-3', apiKey: '', persona: '당신은 트렌디한 감각을 지닌 UI/UX 디자이너입니다. 사용자 경험을 최우선으로 고려합니다.', x: 75, y: 65, color: 'bg-purple-500', icon: Palette, status: '브랜드 로고 디자인 구상 중' },
-  { id: 4, name: '강무비', role: 'Video Creator', specialty: 'video', model: 'sora', apiKey: '', persona: '당신은 감각적인 영상 편집자입니다. 시선을 사로잡는 트랜지션과 효과를 잘 사용합니다.', x: 30, y: 70, color: 'bg-rose-500', icon: Video, status: '홍보 영상 렌더링 준비 중' },
+  { id: 1, name: '박팀장', role: 'Project Manager', specialty: 'text', model: 'gpt-4o', apiKey: '', persona: '당신은 10년 차 IT 프로젝트 매니저입니다. 항상 일정을 준수하고 명확하게 소통합니다.', x: 20, y: 30, color: 'bg-blue-500', icon: FileText, status: '휴식 중... ☕' },
+  { id: 2, name: '김개발', role: 'Software Engineer', specialty: 'code', model: 'claude-3-5-sonnet', apiKey: '', persona: '당신은 시니어 프론트엔드 개발자입니다. 클린 코드와 성능 최적화를 중요하게 생각합니다.', x: 60, y: 25, color: 'bg-green-500', icon: Code, status: '휴식 중... ☕' },
+  { id: 3, name: '이픽셀', role: 'UI/UX Designer', specialty: 'image', model: 'dall-e-3', apiKey: '', persona: '당신은 트렌디한 감각을 지닌 UI/UX 디자이너입니다. 사용자 경험을 최우선으로 고려합니다.', x: 75, y: 65, color: 'bg-purple-500', icon: Palette, status: '휴식 중... ☕' },
+  { id: 4, name: '강무비', role: 'Video Creator', specialty: 'video', model: 'sora', apiKey: '', persona: '당신은 감각적인 영상 편집자입니다. 시선을 사로잡는 트랜지션과 효과를 잘 사용합니다.', x: 30, y: 70, color: 'bg-rose-500', icon: Video, status: '휴식 중... ☕' },
 ];
 
 // 무작위로 변경될 상태 메시지 목록
 const statusMessages = [
-  '코드 리뷰 진행 중 🧐',
-  '잠시 커피 브레이크 ☕',
-  '치명적인 버그 헌팅 🐛',
-  '개발 문서 업데이트 중 📝',
-  '동료와 기술 논의 중 🗣️',
-  '서버 로그 분석 중 📊',
-  '유닛 테스트 코드 작성 ✅',
-  '스택오버플로우 검색 중 🔍',
-  '프로젝트 빌드 대기 중 ⏳',
-  '새로운 기능 구상 중 💡',
-  '이미지 에셋 서칭 중 🖼️',
-  '영상 트랜지션 효과 적용 🎬'
+  '휴식 중... ☕',
+  '오피스 산책 중 🚶',
+  '멍 때리는 중 💭',
+  '다음 작업 대기 중 ⏳',
+  '스트레칭 중 🤸',
+  '창밖 구경 중 🪟',
+  '아이디어 구상 중 💡'
 ];
 
 // 각 NPC별 업무 코드 스니펫 (더블클릭 시 표시)
@@ -93,11 +94,28 @@ export default function DevSim() {
   const [theme, setTheme] = useState('grid');
   const [logHeight, setLogHeight] = useState(300); // Activity Log 패널의 초기 높이
   const [isResizing, setIsResizing] = useState(false);
+  const [activeLogTab, setActiveLogTab] = useState('logs'); // 'logs' | 'thinking'
+  const [thinkingLogs, setThinkingLogs] = useState({}); // { [npcId]: [{ type, content, time }] }
+  const [confettiId, setConfettiId] = useState(null); // 폭죽 효과 상태
+  const [interactionEmoji, setInteractionEmoji] = useState(null); // 대화 시 떠오르는 이모지 상태
+  
+  // 신규 진화 기능 State
+  const [tasks, setTasks] = useState([
+    { id: 1, title: 'DevSim 랜딩 페이지 기획서 초안 작성', specialty: 'text', status: 'todo', assignee: null }
+  ]);
+  const [commandInput, setCommandInput] = useState('');
+  const [approvalReq, setApprovalReq] = useState(null); // Human-in-the-loop 상태
+  
+  // 24/7 자율 주행(Auto) 모드 State
+  const [isAutoMode, setIsAutoMode] = useState(false);
+  const isAutoModeRef = useRef(false);
+  useEffect(() => { isAutoModeRef.current = isAutoMode; }, [isAutoMode]);
 
   const officeRef = useRef(null);
   const draggingIdRef = useRef(null);
   const prevNpcsRef = useRef(initialNPCs);
   const shoutTimeoutRef = useRef(null);
+  const mediaOutputTimeouts = useRef({}); // 결과물 자동 닫기 타임아웃 관리를 위한 Ref
 
   // 로컬 스토리지에서 API 키 및 커스텀 에이전트 데이터 불러오기
   useEffect(() => {
@@ -206,7 +224,7 @@ export default function DevSim() {
       y: Math.random() * 80 + 10,
       color: availableColors[newAgentIndex >= 0 ? newAgentIndex % availableColors.length : 0],
       icon: availableIcons[newAgentIndex >= 0 ? newAgentIndex % availableIcons.length : 0],
-      status: '새롭게 합류! 대기 중...',
+      status: '휴식 중... ☕',
     };
 
     const updatedNpcs = [...npcs, newAgent];
@@ -215,6 +233,25 @@ export default function DevSim() {
     localStorage.setItem('devsim_agents', JSON.stringify(toSave));
     setSelectedId(newId);
     setToastMessage('새로운 에이전트가 추가되었습니다 🤖');
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  // 에이전트 삭제 핸들러
+  const handleDeleteAgent = (agentId) => {
+    if (!window.confirm("정말로 이 에이전트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
+
+    const updatedNpcs = npcs.filter(n => n.id !== agentId);
+    setNpcs(updatedNpcs);
+
+    const toSave = updatedNpcs.map(({ icon, ...rest }) => rest);
+    localStorage.setItem('devsim_agents', JSON.stringify(toSave));
+
+    if (selectedId === agentId) {
+      setSelectedId(null);
+    }
+
+    setToastMessage('에이전트가 삭제되었습니다.');
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
@@ -271,8 +308,8 @@ export default function DevSim() {
     const interval = setInterval(() => {
       setNpcs((currentNpcs) =>
         currentNpcs.map((npc) => {
-          // 드래그 중인 NPC는 자동 이동 스킵
-          if (npc.id === draggingIdRef.current) return npc;
+          // 드래그 중이거나 작업 중(isBusy)인 NPC는 자동 이동 스킵
+          if (npc.id === draggingIdRef.current || npc.isBusy) return npc;
 
           // -10% ~ +10% 범위 내에서 무작위 이동 좌표 생성
           const dx = (Math.random() - 0.5) * 20;
@@ -291,11 +328,12 @@ export default function DevSim() {
     }, 3000); // 3초 간격으로 위치 업데이트
 
     return () => clearInterval(interval);
-  }, []);
   }, [isPaused]);
 
   const handleReset = () => {
     if (shoutTimeoutRef.current) clearTimeout(shoutTimeoutRef.current);
+    Object.values(mediaOutputTimeouts.current).forEach(clearTimeout);
+    mediaOutputTimeouts.current = {};
     setNpcs(initialNPCs);
     localStorage.removeItem('devsim_agents');
     setLogs([]);
@@ -308,6 +346,12 @@ export default function DevSim() {
     setActiveConnection(null);
     setMediaOutputs({});
     setGeneratingMessage('');
+    setConfettiId(null);
+    setInteractionEmoji(null);
+    setTasks([]);
+    setCommandInput('');
+    setApprovalReq(null);
+    setIsAutoMode(false);
   };
 
   // 테스트 명령어 핸들러
@@ -342,7 +386,7 @@ export default function DevSim() {
         if (output.type === 'text') {
           markdown += `${output.content}\n\n`;
         } else if (output.type === 'code') {
-          markdown += \`\`\`javascript\n${output.content}\n\`\`\`\n\n\`;
+          markdown += `\`\`\`javascript\n${output.content}\n\`\`\`\n\n`;
         } else if (output.type === 'image') {
           markdown += `!Generated Image\n\n`;
         } else if (output.type === 'video') {
@@ -370,9 +414,85 @@ export default function DevSim() {
   // 선택된 NPC 찾기
   const selectedNPC = npcs.find(npc => npc.id === selectedId);
 
+  // 하단 글로벌 커맨드 입력 핸들러
+  const handleCommandSubmit = (e) => {
+    e.preventDefault();
+    if (!commandInput.trim()) return;
+
+    // 자연어 의도 파악 (간단한 키워드 매칭)
+    let specialty = 'text';
+    if (commandInput.match(/코드|개발|구현|API|에러|버그|UI/)) specialty = 'code';
+    else if (commandInput.match(/이미지|디자인|로고|그림/)) specialty = 'image';
+    else if (commandInput.match(/영상|비디오|렌더링|애니메이션/)) specialty = 'video';
+
+    const newTask = {
+      id: Date.now(),
+      title: commandInput,
+      specialty,
+      status: 'todo',
+      assignee: null
+    };
+
+    setTasks(prev => [...prev, newTask]);
+    setCommandInput('');
+    setToastMessage('칸반 보드에 새 작업이 등록되었습니다 📋');
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  // 칸반 보드 자동 할당 (Autonomous Queue System)
+  useEffect(() => {
+    if (isPaused) return;
+    const todoTasks = tasks.filter(t => t.status === 'todo');
+    if (todoTasks.length === 0) return;
+
+    const assignTimer = setTimeout(() => {
+      const idleNpcs = npcs.filter(n => !n.isBusy && generatingId !== n.id && !approvalReq);
+      if (idleNpcs.length === 0) return;
+
+      let taskAssigned = false;
+      let newTasks = [...tasks];
+
+      for (const npc of idleNpcs) {
+        const taskIdx = newTasks.findIndex(t => t.status === 'todo' && t.specialty === npc.specialty);
+        if (taskIdx !== -1) {
+          const taskToAssign = newTasks[taskIdx];
+          newTasks[taskIdx] = { ...taskToAssign, status: 'in-progress', assignee: npc.name };
+          taskAssigned = true;
+          handleGenerate(npc, taskToAssign); // 에이전트가 작업을 스스로 픽업!
+        }
+      }
+      if (taskAssigned) setTasks(newTasks);
+    }, 1500);
+    return () => clearTimeout(assignTimer);
+  }, [tasks, npcs, isPaused, generatingId, approvalReq]);
+
   // 미디어 생성 시뮬레이션 핸들러
-  const handleGenerate = async (npc) => {
+  const handleGenerate = async (npc, linkedTask = null) => {
     setGeneratingId(npc.id);
+
+    // '생각 일지' 기록을 위한 헬퍼 함수
+    const addThinkingLog = (npcId, logEntry) => {
+      setThinkingLogs(prev => ({
+        ...prev,
+        [npcId]: [...(prev[npcId] || []), { ...logEntry, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }]
+      }));
+    };
+
+    // 스트리밍 청크를 처리하는 콜백 함수
+    const handleChunk = (chunk) => {
+      setThinkingLogs(prev => {
+        const currentLogs = prev[npc.id] || [];
+        if (currentLogs.length === 0) return prev;
+        const lastLogIndex = currentLogs.length - 1;
+        const lastLog = currentLogs[lastLogIndex];
+        if (lastLog && lastLog.type === 'ai') {
+          const updatedLastLog = { ...lastLog, content: lastLog.content + chunk };
+          return { ...prev, [npc.id]: [...currentLogs.slice(0, lastLogIndex), updatedLastLog] };
+        }
+        return prev;
+      });
+    };
     
     let message = '';
     let output = {};
@@ -388,59 +508,98 @@ export default function DevSim() {
         return;
       }
 
-      let systemPrompt = npc.persona || '당신은 도움이 되는 AI 어시스턴트입니다.';
-      let userPrompt = '';
+      // 생각 일지 초기화 및 기록 시작
+      setThinkingLogs(prev => ({ ...prev, [npc.id]: [] }));
+      addThinkingLog(npc.id, { type: 'system', content: '작업 지시를 수신했습니다. 목표를 분석합니다...' });
 
-      // 기존에 생성된 코드 결과물이 있는지 확인 (author ID와 함께)
-      const existingCodeEntry = Object.entries(mediaOutputs).find(([_, m]) => m.type === 'code');
+      let systemPrompt = npc.persona || '당신은 도움이 되는 AI 어시스턴트입니다.';
+      let userPrompt = linkedTask ? linkedTask.title : '';
+
+      // 문서/기획/피드백(text)을 담당한 에이전트의 결과물이 있는지 탐색 (협업 베이스)
+      const textOutputEntry = Object.entries(mediaOutputs).find(([_, m]) => m.type === 'text');
 
       if (npc.specialty === 'text') {
-        if (existingCodeEntry) { // 작성된 코드가 있다면 코드 리뷰 수행
-          sourceId = Number(existingCodeEntry[0]);
-          message = '작성된 코드 리뷰 중 (LLM)... 🧐';
-          completionStatus = '코드 리뷰 완료! 피드백을 확인하세요. 📝';
-          userPrompt = `다음 코드를 리뷰하고, 보안 취약점이나 개선점, 혹은 잘된 점을 3~4문장으로 짧고 명확하게 피드백해줘.\n\n[코드]\n${existingCodeEntry[1].content}`;
-        } else { // 코드가 없다면 기존처럼 기획안 작성
-          message = '새로운 프로젝트 기획안 작성 중 (LLM)... 📝';
-          completionStatus = '기획안 작성 완료! 공유할게요.';
-          userPrompt = '새로운 AI 서비스에 대한 간단한 프로젝트 기획안 초안을 3~4문장으로 짧게 작성해줘.';
+        const isReviewTask = linkedTask && linkedTask.title.includes('[리뷰]');
+        if (isReviewTask) {
+          const targetSpec = linkedTask.targetSpecialty || 'code';
+          const targetOutputEntry = Object.entries(mediaOutputs).find(([_, m]) => m.type === targetSpec) || Object.entries(mediaOutputs).find(([_, m]) => m.type !== 'text');
+          
+          if (targetOutputEntry) {
+            sourceId = Number(targetOutputEntry[0]);
+            const outputType = targetOutputEntry[1].type;
+            message = `${outputType.toUpperCase()} 결과물 리뷰 중 (LLM)... 🧐`;
+            completionStatus = '피드백 작성 완료! 📝';
+            
+            let reviewContext = targetOutputEntry[1].content;
+            if (outputType === 'image' || outputType === 'video') reviewContext = `[시각/미디어 데이터가 생성되었습니다. 프롬프트 의도에 맞게 보완 아이디어를 제시해주세요.]`;
+            
+            userPrompt += `\n\n다음은 동료가 작업한 [${outputType}] 결과물입니다. 이를 검토하고 더 나은 결과물을 위한 개선점이나 아이디어를 3~4문장으로 명확하게 피드백해주세요.\n\n[결과물/참조]\n${reviewContext}`;
+            addThinkingLog(npc.id, { type: 'system', content: `기존 ${outputType} 결과물 리뷰를 시작합니다.` });
+          }
+        } else {
+          message = '새로운 기획안/문서 작성 중 (LLM)... 📝';
+          completionStatus = '문서 작성 완료! 📝';
+          if (!linkedTask) userPrompt = '새로운 AI 서비스에 대한 간단한 프로젝트 기획안 초안을 3~4문장으로 짧게 작성해줘.';
         }
       } else {
-        if (mediaOutputs[1]) sourceId = 1;
-        message = mediaOutputs[1] ? '기획안을 분석하여 로직 설계 중 (LLM)... 🧠' : '핵심 로직 구현 중 (LLM)... 💻';
+        if (textOutputEntry) sourceId = Number(textOutputEntry[0]);
+        message = textOutputEntry ? '피드백/기획안 분석 및 코딩 중 (LLM)... 💻' : '핵심 로직 구현 중 (LLM)... 💻';
         completionStatus = '기획안 기반 코딩 완료! 💻';
-        userPrompt = mediaOutputs[1] 
-          ? `다음 기획안을 바탕으로 프론트엔드 컴포넌트나 백엔드 핵심 로직을 작성해줘. 주석도 포함해줘.\n\n[기획안]\n${mediaOutputs[1].content}\n\n마크다운 코드 블록(```) 없이 오직 코드 텍스트만 반환해줘.` 
+        
+        if (linkedTask) {
+          userPrompt += textOutputEntry ? `\n\n[참고 문서/피드백]\n${textOutputEntry[1].content}` : '';
+        } else {
+          userPrompt = textOutputEntry 
+          ? `다음 기획안/피드백을 바탕으로 프론트엔드 컴포넌트나 백엔드 핵심 로직을 작성해줘. 주석도 포함해줘.\n\n[참고 문서]\n${textOutputEntry[1].content}\n\n마크다운 코드 블록(\`\`\`) 없이 오직 코드 텍스트만 반환해줘.` 
           : '간단한 로그인 API 로직이나 리액트 컴포넌트 코드를 작성해줘. 마크다운 코드 블록(```) 없이 오직 코드 텍스트만 반환해줘.';
+        }
+        if (textOutputEntry) addThinkingLog(npc.id, { type: 'system', content: '참고 문서(피드백)를 전달받았습니다. 작업을 시작합니다.' });
       }
 
       if (sourceId) setActiveConnection({ source: sourceId, target: npc.id });
+      if (linkedTask) {
+        userPrompt = `[특별 지시사항 (칸반 보드)]\n사용자가 다음 칸반 작업을 할당했습니다: "${linkedTask.title}"\n위 작업에 맞춰 당신의 역할을 수행해줘.\n\n` + userPrompt;
+        message = `칸반 작업 수행 중... 🚀`;
+      }
       setGeneratingMessage(message);
 
-      try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: npc.model || 'gpt-4o',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.7
-          })
-        });
+      // 작업자 및 협업 대상자를 화이트보드로 이동 고정
+      setNpcs(curr => curr.map(n => {
+        if (n.id === npc.id) return { ...n, isBusy: true, x: sourceId ? 65 : 50, y: 50 };
+        if (sourceId && n.id === sourceId) return { ...n, isBusy: true, x: 35, y: 50 };
+        return n;
+      }));
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error?.message || 'LLM API 요청 실패');
-        }
-        
-        const data = await response.json();
-        let generatedText = data.choices.message.content;
+      await new Promise(r => setTimeout(r, 300));
+      addThinkingLog(npc.id, { type: 'user', content: `[User Prompt] ${userPrompt.substring(0, 150)}...` });
+      await new Promise(r => setTimeout(r, 500));
+
+      // Human-in-the-Loop: 작업 진행 전 승인 절차
+      setGeneratingMessage('사용자 결재 대기 중 ✋');
+      addThinkingLog(npc.id, { type: 'system', content: '사용자 승인(Human-in-the-Loop) 대기 중...' });
+      
+      const isApproved = await new Promise((resolve) => {
+        setApprovalReq({ npc, prompt: userPrompt, resolve });
+      });
+      setApprovalReq(null);
+
+      if (!isApproved) {
+        addThinkingLog(npc.id, { type: 'system', content: '작업이 반려되었습니다. 칸반 보드로 작업을 되돌립니다.' });
+        setGeneratingId(null);
+        setActiveConnection(null);
+        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '작업 반려됨 🛑' } : n));
+        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+        return;
+      }
+
+      addThinkingLog(npc.id, { type: 'system', content: '작업 승인됨. 모델 호출을 시작합니다.' });
+      setGeneratingMessage(message); // 원래 메시지로 복구
+      
+      addThinkingLog(npc.id, { type: 'system', content: `AI 모델 [${npc.model}] 호출을 시작합니다... (스트리밍)` });
+      addThinkingLog(npc.id, { type: 'ai', content: '' }); // AI 응답을 채워넣을 빈 로그 추가
+
+      try {
+        let generatedText = await callLLM(apiKey, npc.model, systemPrompt, userPrompt, handleChunk);
 
         // 마크다운 백틱(```) 제거 방어 로직 (순수 코드만 남기기 위함)
         if (npc.specialty === 'code') {
@@ -448,11 +607,14 @@ export default function DevSim() {
         }
 
         output = { type: npc.specialty, content: generatedText };
+        addThinkingLog(npc.id, { type: 'system', content: '모델 응답 스트림이 종료되었습니다. 결과물을 정리합니다.' });
       } catch (error) {
         console.error('LLM API Error:', error);
         alert(`텍스트/코드 생성 실패: ${error.message}`);
         setGeneratingId(null);
         setActiveConnection(null);
+        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
+        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
         return;
       }
     } else if (npc.specialty === 'image') {
@@ -471,44 +633,52 @@ export default function DevSim() {
       } else {
         message = '이미지 렌더링 중 (DALL-E 3)... 🎨';
       }
+      if (linkedTask) {
+        message = `칸반 이미지 작업 렌더링 중... 🚀`;
+      }
       
       if (sourceId) setActiveConnection({ source: sourceId, target: npc.id });
       setGeneratingMessage(message);
 
+      // 작업자 및 협업 대상자를 화이트보드로 이동 고정
+      setNpcs(curr => curr.map(n => {
+        if (n.id === npc.id) return { ...n, isBusy: true, x: sourceId ? 65 : 50, y: 50 };
+        if (sourceId && n.id === sourceId) return { ...n, isBusy: true, x: 35, y: 50 };
+        return n;
+      }));
+
       // 박팀장의 기획안 결과물이 있다면 이를 포함하여 프롬프트 작성
-      let userPrompt = "IT 서비스에 어울리는 트렌디하고 세련된 브랜드 로고나 일러스트를 그려줘. 깔끔하고 직관적인 디자인으로.";
+      let userPrompt = linkedTask ? linkedTask.title : "IT 서비스에 어울리는 트렌디하고 세련된 브랜드 로고나 일러스트를 그려줘. 깔끔하고 직관적인 디자인으로.";
       if (mediaOutputs[1]) {
         userPrompt += `\n\n다음 기획안 컨셉을 적극 반영해줘:\n${mediaOutputs[1].content}`;
       }
 
-      try {
-        const response = await fetch('https://api.openai.com/v1/images/generations', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: "dall-e-3",
-            prompt: userPrompt,
-            n: 1,
-            size: "1024x1024"
-          })
-        });
+      // Human-in-the-Loop 컨펌
+      setGeneratingMessage('사용자 결재 대기 중 ✋');
+      const isApproved = await new Promise((resolve) => {
+        setApprovalReq({ npc, prompt: userPrompt, resolve });
+      });
+      setApprovalReq(null);
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error?.message || 'API 요청 실패');
-        }
-        
-        const data = await response.json();
-        // OpenAI DALL-E 3 API가 리턴한 이미지 URL 세팅
-        output = { type: 'image', content: data.data[0].url };
+      if (!isApproved) {
+        setGeneratingId(null);
+        setActiveConnection(null);
+        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '작업 반려됨 🛑' } : n));
+        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+        return;
+      }
+      setGeneratingMessage(message);
+
+      try {
+        const imageUrl = await callImageGen(apiKey, userPrompt);
+        output = { type: 'image', content: imageUrl };
       } catch (error) {
         console.error('DALL-E 3 Error:', error);
         alert(`이미지 생성 실패: ${error.message}`);
         setGeneratingId(null);
         setActiveConnection(null);
+        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
+        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
         return;
       }
     } else if (npc.specialty === 'video') {
@@ -519,10 +689,20 @@ export default function DevSim() {
       } else {
         message = '영상 렌더링 중... 🎬';
       }
+      if (linkedTask) {
+        message = `칸반 영상 작업 렌더링 중... 🚀`;
+      }
       output = { type: 'video', content: 'https://www.w3schools.com/html/mov_bbb.mp4' };
       
       if (sourceId) setActiveConnection({ source: sourceId, target: npc.id });
       setGeneratingMessage(message);
+
+      // 작업자 및 협업 대상자를 화이트보드로 이동 고정
+      setNpcs(curr => curr.map(n => {
+        if (n.id === npc.id) return { ...n, isBusy: true, x: sourceId ? 65 : 50, y: 50 };
+        if (sourceId && n.id === sourceId) return { ...n, isBusy: true, x: 35, y: 50 };
+        return n;
+      }));
     }
 
     // API를 호출하지 않는 영상 작업만 기존처럼 2.5초 지연을 두어 시뮬레이션
@@ -534,6 +714,7 @@ export default function DevSim() {
           alert('Video API 키가 설정되지 않았습니다. 설정 모달에서 Video API 키를 입력해주세요.');
           setGeneratingId(null);
           setActiveConnection(null);
+          setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
           return;
         }
 
@@ -549,6 +730,24 @@ export default function DevSim() {
           };
           requestBody.prompt = "Animate this image with cinematic camera pan, high quality";
         }
+        
+        if (linkedTask) requestBody.prompt = linkedTask.title;
+
+        // Human-in-the-Loop 컨펌
+        setGeneratingMessage('사용자 결재 대기 중 ✋');
+        const isApproved = await new Promise((resolve) => {
+          setApprovalReq({ npc, prompt: requestBody.prompt, resolve });
+        });
+        setApprovalReq(null);
+
+        if (!isApproved) {
+          setGeneratingId(null);
+          setActiveConnection(null);
+          setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '작업 반려됨 🛑' } : n));
+          if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+          return;
+        }
+        setGeneratingMessage(message);
 
         const createRes = await fetch('https://api.lumalabs.ai/dream-machine/v1/generations', {
           method: 'POST',
@@ -576,6 +775,8 @@ export default function DevSim() {
             videoUrl = pollData.assets.video;
             break;
           } else if (pollData.state === 'failed') {
+            setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
+            if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
             throw new Error('비디오 생성 실패 (API 내부 오류)');
           }
           
@@ -588,16 +789,77 @@ export default function DevSim() {
         alert(`영상 생성 실패: ${error.message}`);
         setGeneratingId(null);
         setActiveConnection(null);
+        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
+        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
         return;
       }
     }
 
     setGeneratingId(null);
     setActiveConnection(null); // 작업이 완료되면 연결선 해제
-    setMediaOutputs(prev => ({ ...prev, [npc.id]: output }));
-    // 활동 로그 추가 유도
-    setNpcs(curr => curr.map(n => n.id === npc.id ? { ...n, status: completionStatus } : n));
     
+    // 기존 결과물 닫기 타임아웃이 있다면 제거 (연속 작업 시 방어 로직)
+    if (mediaOutputTimeouts.current[npc.id]) {
+      clearTimeout(mediaOutputTimeouts.current[npc.id]);
+    }
+    
+    setMediaOutputs(prev => ({ ...prev, [npc.id]: output }));
+
+    // 10초 뒤에 결과물 말풍선 자동 닫기
+    mediaOutputTimeouts.current[npc.id] = setTimeout(() => {
+      setMediaOutputs(prev => { const next = { ...prev }; delete next[npc.id]; return next; });
+    }, 10000);
+
+    // 활동 로그 추가 유도 및 화이트보드 고정(isBusy) 해제
+    setNpcs(curr => curr.map(n => {
+      if (n.id === npc.id) return { ...n, status: completionStatus, isBusy: false };
+      if (sourceId && n.id === sourceId) return { ...n, isBusy: false };
+      return n;
+    }));
+
+    // 칸반 작업 완료 처리
+    if (linkedTask) {
+      setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'done' } : t));
+
+      // 상호 피드백(핑퐁) 꼬리물기 태스크 자동 생성 로직
+      const baseTitle = linkedTask.title.replace(/\[.*?\]\s*/g, ''); // [태그] 제거
+      
+      // 무한 루프를 방지하기 위해 [반영] 단계까지만 진행
+      if (!linkedTask.title.includes('[반영]')) {
+        let nextSpecialty = null;
+        let nextTitle = '';
+
+        if (npc.specialty === 'code' && !linkedTask.title.includes('[리뷰]')) {
+          nextTitle = `[리뷰] ${baseTitle} 코드 피드백 및 추가 기능 제안`;
+          nextSpecialty = 'text';
+        } else if (npc.specialty === 'image' && !linkedTask.title.includes('[리뷰]')) {
+          nextTitle = `[리뷰] ${baseTitle} 디자인 검토 및 개선점 제안`;
+          nextSpecialty = 'text';
+        } else if (npc.specialty === 'text' && linkedTask.title.includes('[리뷰]')) {
+          nextTitle = `[반영] ${baseTitle} 피드백 기반 코드/기능 수정`;
+          nextSpecialty = 'code';
+        }
+
+        if (nextTitle && nextSpecialty) {
+          setTimeout(() => {
+            setTasks(prev => [...prev, {
+              id: Date.now(),
+              title: nextTitle,
+              specialty: nextSpecialty,
+              status: 'todo',
+              assignee: null
+            }]);
+          }, 2000); // 2초 뒤 자연스럽게 칸반에 등록
+        }
+      }
+    }
+    
+    // 폭죽 효과 트리거 (1.5초 후 자동 제거)
+    setConfettiId(npc.id);
+    setTimeout(() => {
+      setConfettiId(curr => curr === npc.id ? null : curr);
+    }, 1500);
+
     // 작업 완료 토스트 알림 띄우기
     setToastMessage(`[${npc.name}] ${completionStatus}`);
     setShowToast(true);
@@ -609,125 +871,8 @@ export default function DevSim() {
 
   // 웹훅 알림 통합 핸들러
   const handleWebhookNotifications = (npc, output) => {
-    if (apiKeys.slackWebhookUrl) {
-      sendToSlack(npc, output);
-    }
-    if (apiKeys.discordWebhookUrl) {
-      sendToDiscord(npc, output);
-    }
-  };
-
-  // 슬랙(Slack) 웹훅 전송 핸들러
-  const sendToSlack = async (npc, output) => {
-    const createSlackPayload = (npc, output) => {
-      const blocks = [
-        {
-          "type": "header",
-          "text": {
-            "type": "plain_text",
-            "text": `🤖 [${npc.name}]님의 작업 완료!`,
-            "emoji": true
-          }
-        },
-        {
-          "type": "context",
-          "elements": [
-            { "type": "mrkdwn", "text": `*역할:* ${npc.role} | *특기:* ${output.type}` }
-          ]
-        }
-      ];
-
-      if (output.type === 'text') {
-        blocks.push({ "type": "section", "text": { "type": "mrkdwn", "text": `> ${output.content}` } });
-      } else if (output.type === 'code') {
-        blocks.push({ "type": "section", "text": { "type": "mrkdwn", "text": "```\n" + output.content + "\n```" } });
-      } else if (output.type === 'image') {
-        blocks.push({ "type": "image", "image_url": output.content, "alt_text": "Generated Image" });
-      } else if (output.type === 'video') {
-        blocks.push({ "type": "section", "text": { "type": "mrkdwn", "text": `생성된 영상 결과물입니다: <${output.content}|영상 재생하기>` } });
-      }
-      return { blocks };
-    };
-
-    const payload = createSlackPayload(npc, output);
-
-    try {
-      const response = await fetch(apiKeys.slackWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        console.error('Failed to send to Slack webhook:', response.statusText);
-      }
-    } catch (error) {
-      console.error('Error sending to Slack webhook:', error);
-    }
-  };
-
-  // 디스코드(Discord) 웹훅 전송 핸들러
-  const sendToDiscord = async (npc, output) => {
-    const getColorDecimal = (colorClassName) => {
-      const colorMap = {
-        'bg-blue-500': 3899894,   // #3b82f6
-        'bg-green-500': 2278750,  // #22c55e
-        'bg-purple-500': 11032311, // #a855f7
-        'bg-rose-500': 15999838,  // #f43f5e
-        'bg-yellow-500': 15381256, // #eab308
-        'bg-teal-500': 1358006,   // #14b8a6
-        'bg-orange-500': 16347926, // #f97316
-        'bg-cyan-500': 442196,    // #06b6d4
-        'bg-lime-500': 8703000,   // #84cc16
-        'bg-pink-500': 15485081,  // #ec4899
-      };
-      return colorMap[colorClassName] || 5855577; // default: #595959
-    };
-
-    const createDiscordPayload = (npc, output) => {
-      const embed = {
-        author: {
-          name: `[${npc.name}]님의 작업 완료!`,
-        },
-        description: `**역할:** ${npc.role}\n**특기:** ${output.type}`,
-        color: getColorDecimal(npc.color),
-        timestamp: new Date().toISOString(),
-        footer: {
-          text: "DevSim"
-        }
-      };
-
-      if (output.type === 'text') {
-        embed.fields = [{ name: '결과물', value: output.content.substring(0, 1024) }];
-      } else if (output.type === 'code') {
-        embed.description += "\n\n**결과물:**\n```" + (output.content.substring(0, 1500)) + "\n```";
-      } else if (output.type === 'image') {
-        embed.fields = [{ name: '결과물', value: '아래 이미지 확인' }];
-        embed.image = { url: output.content };
-      } else if (output.type === 'video') {
-        embed.fields = [{ name: '결과물', value: `영상 재생하기` }];
-      }
-
-      return {
-        username: "DevSim 알림봇",
-        avatar_url: "https://i.imgur.com/4M34hi2.png", // Generic Bot Icon
-        embeds: [embed],
-      };
-    };
-
-    const payload = createDiscordPayload(npc, output);
-
-    try {
-      const response = await fetch(apiKeys.discordWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        console.error('Failed to send to Discord webhook:', response.status, response.statusText);
-      }
-    } catch (error) {
-      console.error('Error sending to Discord webhook:', error);
-    }
+    sendToSlack(apiKeys.slackWebhookUrl, npc, output);
+    sendToDiscord(apiKeys.discordWebhookUrl, npc, output);
   };
 
   // 미디어 다운로드 핸들러
@@ -785,11 +930,61 @@ export default function DevSim() {
 
   const handleMouseUp = () => {
     if (draggingIdRef.current) {
-      setNpcs((currentNpcs) =>
-        currentNpcs.map((npc) =>
-          npc.id === draggingIdRef.current ? { ...npc, status: '새로운 위치로 이동 완료 📍' } : npc
-        )
-      );
+      const draggedId = draggingIdRef.current;
+      const draggedNpc = npcs.find(n => n.id === draggedId);
+      
+      let targetNpc = null;
+      if (draggedNpc) {
+        // 드래그한 NPC와 다른 NPC 간의 거리 계산 (유클리드 거리 6% 이내면 충돌로 간주)
+        targetNpc = npcs.find(n => 
+          n.id !== draggedId && 
+          !n.isBusy && // 작업 중이거나 이미 대화 중인 NPC는 방해하지 않음
+          Math.hypot(n.x - draggedNpc.x, n.y - draggedNpc.y) < 6
+        );
+      }
+
+      if (targetNpc) {
+        const topics = ['코드 아키텍처', 'UI/UX 디자인', '오늘 점심 메뉴', '새로운 AI 트렌드', '프로젝트 일정'];
+        const topic = topics[Math.floor(Math.random() * topics.length)];
+        
+        const emojis = ['💖', '❗', '💡', '✨', '🔥', '👀', '🤔', '💬'];
+        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+        const newX = targetNpc.x > 50 ? targetNpc.x - 7 : targetNpc.x + 7;
+
+        setNpcs((currentNpcs) => 
+          currentNpcs.map(npc => {
+            if (npc.id === draggedId) {
+              // 화면 밖으로 나가지 않도록 타겟의 위치에 따라 좌/우로 나란히 배치
+              return { ...npc, x: newX, y: targetNpc.y, status: `🗣️ "${topic} 논의할까요?"`, isBusy: true };
+            }
+            if (npc.id === targetNpc.id) {
+              return { ...npc, status: `💬 "좋아요! ${topic} 이야기해봐요."`, isBusy: true };
+            }
+            return npc;
+          })
+        );
+
+        // 두 에이전트 중앙에 이모지 표시
+        setInteractionEmoji({ x: (newX + targetNpc.x) / 2, y: targetNpc.y - 12, emoji: randomEmoji });
+
+        // 5초 후 대화 상태(isBusy) 해제 및 일상으로 복귀
+        setTimeout(() => {
+          setNpcs(current => current.map(n => 
+            (n.id === draggedId || n.id === targetNpc.id) ? { ...n, isBusy: false, status: '대화 종료 👋' } : n
+          ));
+          setInteractionEmoji(null);
+        }, 5000);
+
+        setToastMessage(`${draggedNpc.name}님과 ${targetNpc.name}님이 대화를 시작했습니다! 💬`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      } else {
+        setNpcs((currentNpcs) =>
+          currentNpcs.map((npc) =>
+            npc.id === draggedId ? { ...npc, status: '새로운 위치로 이동 완료 📍' } : npc
+          )
+        );
+      }
     }
     setDraggingId(null);
     draggingIdRef.current = null;
@@ -797,6 +992,20 @@ export default function DevSim() {
 
   return (
     <div className="flex h-screen w-full bg-slate-900 text-slate-200 font-sans relative">
+      {/* 폭죽 애니메이션을 위한 글로벌 스타일 */}
+      <style>{`
+        @keyframes explode {
+          0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+          100% { transform: translate(var(--tx), var(--ty)) rotate(720deg) scale(0); opacity: 0; }
+        }
+        @keyframes floatEmoji {
+          0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+          20% { transform: translate(-50%, -15px) scale(1.2); opacity: 1; }
+          80% { transform: translate(-50%, -35px) scale(1); opacity: 1; }
+          100% { transform: translate(-50%, -50px) scale(0.8); opacity: 0; }
+        }
+      `}</style>
+
       {/* API 키 설정 모달 */}
       {showApiModal && (
         <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -940,6 +1149,44 @@ export default function DevSim() {
         </div>
       )}
 
+      {/* Human-in-the-Loop 결재 모달 */}
+      {approvalReq && (
+        <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-indigo-500/50 rounded-2xl shadow-2xl p-6 w-full max-w-md relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 to-orange-500"></div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg ${approvalReq.npc.color}`}>
+                {React.createElement(approvalReq.npc.icon || User, { className: "w-5 h-5 text-white" })}
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-lg">결재 대기 중 ✋</h3>
+                <p className="text-xs text-slate-400">{approvalReq.npc.name}님이 진행 승인을 요청합니다.</p>
+              </div>
+            </div>
+            
+            <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700 mb-6 max-h-48 overflow-y-auto">
+              <p className="text-xs text-slate-400 mb-2 font-bold uppercase tracking-wider">작업 내용 (프롬프트)</p>
+              <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap font-mono">{approvalReq.prompt}</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => approvalReq.resolve(false)}
+                className="flex-1 py-2.5 rounded-xl font-bold border border-slate-600 text-slate-300 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/50 transition-colors flex items-center justify-center gap-2"
+              >
+                <ThumbsDown className="w-4 h-4" /> 반려 (Cancel)
+              </button>
+              <button 
+                onClick={() => approvalReq.resolve(true)}
+                className="flex-1 py-2.5 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <ThumbsUp className="w-4 h-4" /> 승인 (Proceed)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 메인 'Office' 영역 */}
       <div className="flex-1 p-6 relative flex flex-col">
         <div 
@@ -952,6 +1199,77 @@ export default function DevSim() {
           {/* 테마 배경 */}
           <div className={`absolute inset-0 transition-all duration-500 ${themes[theme].style}`}></div>
           
+          {/* Auto Mode 홀로그램 배경 시각화 */}
+          {isAutoMode && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden mix-blend-screen opacity-80">
+              <span 
+                className="text-[10vw] font-black text-emerald-500/10 tracking-[0.3em] uppercase select-none animate-pulse"
+                style={{ textShadow: '0 0 60px rgba(52, 211, 153, 0.4), 0 0 120px rgba(52, 211, 153, 0.2)' }}
+              >
+                AUTO MODE
+              </span>
+            </div>
+          )}
+          
+          {/* 화이트보드 (협업 존) */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-48 bg-slate-800/40 border border-slate-600/50 rounded-2xl backdrop-blur-sm flex flex-col items-center justify-center pointer-events-none z-0 shadow-2xl">
+            <div className="w-56 h-28 border border-slate-500/50 bg-slate-900/50 rounded-lg flex items-center justify-center relative overflow-hidden shadow-inner">
+               <div className="absolute top-2 left-2 flex gap-1.5">
+                 <div className="w-2 h-2 rounded-full bg-rose-400/70"></div>
+                 <div className="w-2 h-2 rounded-full bg-amber-400/70"></div>
+                 <div className="w-2 h-2 rounded-full bg-emerald-400/70"></div>
+               </div>
+               <span className="text-slate-500/50 font-black tracking-widest text-2xl uppercase">WHITEBOARD</span>
+            </div>
+            <div className="absolute bottom-3 text-xs text-slate-400 font-semibold tracking-wide">Collaboration Zone</div>
+          </div>
+
+          {/* 칸반 보드 (Kanban Board) UI */}
+          <div className="absolute top-6 right-6 w-72 bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-700 shadow-2xl z-20 flex flex-col max-h-[60%] overflow-hidden pointer-events-none group hover:pointer-events-auto transition-all opacity-80 hover:opacity-100">
+            <div className="p-3 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
+              <span className="font-bold text-slate-200 flex items-center gap-2">
+                <LayoutList className="w-4 h-4 text-indigo-400" /> Task Board
+              </span>
+            </div>
+            <div className="p-3 overflow-y-auto flex-1 space-y-2 custom-scrollbar">
+              {tasks.map(task => (
+                <div key={task.id} className="bg-slate-800/90 border border-slate-600 p-2.5 rounded-lg shadow-sm">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="text-xs font-bold text-slate-300 break-words flex-1 pr-2 leading-tight">{task.title}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
+                      task.status === 'todo' ? 'bg-slate-700 text-slate-400' :
+                      task.status === 'in-progress' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-emerald-500/20 text-emerald-400'
+                    }`}>
+                      {task.status === 'in-progress' ? `WIP: ${task.assignee}` : task.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                      {task.specialty === 'image' ? <Palette className="w-3 h-3"/> : task.specialty === 'code' ? <Code className="w-3 h-3"/> : task.specialty === 'video' ? <Video className="w-3 h-3"/> : <FileText className="w-3 h-3"/>}
+                      {task.specialty.toUpperCase()}
+                    </span>
+                    {task.status === 'done' && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                  </div>
+                </div>
+              ))}
+              {tasks.length === 0 && <p className="text-xs text-slate-500 text-center py-4">등록된 작업이 없습니다.</p>}
+            </div>
+          </div>
+
+          {/* 대화 시 떠오르는 이모지 시각화 */}
+          {interactionEmoji && (
+            <div
+              className="absolute pointer-events-none z-40 text-4xl drop-shadow-lg"
+              style={{
+                left: `${interactionEmoji.x}%`,
+                top: `${interactionEmoji.y}%`,
+                animation: 'floatEmoji 2.5s ease-in-out infinite'
+              }}
+            >
+              {interactionEmoji.emoji}
+            </div>
+          )}
+
           {/* 에이전트 간 협업 레이저(연결선) 시각화 */}
           {activeConnection && (
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
@@ -1034,6 +1352,22 @@ export default function DevSim() {
                 onClick={() => setSelectedId(npc.id)}
                 onMouseDown={(e) => handleMouseDown(e, npc.id)}
               >
+                {/* 생각 중(작업 중) 타이핑 애니메이션 생각풍선 */}
+                {generatingId === npc.id && (
+                  <div className="absolute bottom-[115px] flex flex-col items-center z-30 pointer-events-none drop-shadow-md">
+                    <div className="bg-white px-4 py-3 rounded-full shadow-sm border border-slate-200 flex items-center justify-center gap-1.5 min-w-[60px]">
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                    {/* 생각 풍선 꼬리 (작은 원 두 개) */}
+                    <div className="flex flex-col mt-1 gap-1 -ml-6">
+                      <div className="w-2.5 h-2.5 bg-white rounded-full border border-slate-200 shadow-sm"></div>
+                      <div className="w-1.5 h-1.5 bg-white rounded-full border border-slate-200 shadow-sm ml-2"></div>
+                    </div>
+                  </div>
+                )}
+
                 {/* 프로그레스 바 (작업 렌더링 중) */}
                 {generatingId === npc.id && (
                   <div className="absolute bottom-16 px-4 py-2 bg-slate-800 text-slate-200 text-xs font-bold rounded-2xl shadow-xl z-30 flex flex-col items-center gap-2 whitespace-nowrap border border-indigo-500/50">
@@ -1059,7 +1393,11 @@ export default function DevSim() {
                            mediaOutputs[npc.id].type === 'code' ? <Code className="w-3 h-3"/> : <FileText className="w-3 h-3"/>}
                           {mediaOutputs[npc.id].type} RESULT
                         </span>
-                        <button onClick={(e) => { e.stopPropagation(); setMediaOutputs(prev => { const n = {...prev}; delete n[npc.id]; return n; }) }} className="text-slate-500 hover:text-red-400 transition-colors">
+                        <button onClick={(e) => { 
+                          e.stopPropagation(); 
+                          if (mediaOutputTimeouts.current[npc.id]) clearTimeout(mediaOutputTimeouts.current[npc.id]);
+                          setMediaOutputs(prev => { const n = {...prev}; delete n[npc.id]; return n; }) 
+                        }} className="text-slate-500 hover:text-red-400 transition-colors">
                           <X className="w-3 h-3"/>
                         </button>
                       </div>
@@ -1119,6 +1457,16 @@ export default function DevSim() {
                   </div>
                 )}
 
+                {/* 평상시 상태 메시지 말풍선 */}
+                {!mediaOutputs[npc.id] && generatingId !== npc.id && npc.status && (
+                  <div className="absolute bottom-16 flex flex-col items-center z-30 opacity-80 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none drop-shadow-md">
+                    <div className="bg-white text-slate-800 text-[10px] font-bold px-3 py-1.5 rounded-2xl shadow-sm whitespace-nowrap border border-slate-200">
+                      {npc.status}
+                    </div>
+                    <div className="w-0 h-0 border-x-4 border-x-transparent border-t-5 border-t-white -mt-[1px]"></div>
+                  </div>
+                )}
+
                 {/* 이름표 (Name Tag) */}
                 <div 
                   className={`mb-2 px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap shadow-lg transition-all duration-300 ${
@@ -1160,9 +1508,56 @@ export default function DevSim() {
                 {isSelected && (
                   <div className={`absolute w-12 h-12 rounded-full animate-ping opacity-30 ${npc.color} pointer-events-none`}></div>
                 )}
+
+                {/* 폭죽 (Confetti) 효과 */}
+                {confettiId === npc.id && (
+                  <div className="absolute top-1/2 left-1/2 w-0 h-0 pointer-events-none z-50">
+                    {[...Array(20)].map((_, i) => {
+                      // 무작위 각도와 거리 계산
+                      const angle = (i * 360) / 20;
+                      const distance = 50 + Math.random() * 60; // 50px ~ 110px
+                      const tx = `${Math.cos(angle * Math.PI / 180) * distance}px`;
+                      const ty = `${Math.sin(angle * Math.PI / 180) * distance}px`;
+                      const colors = ['bg-rose-500', 'bg-blue-500', 'bg-yellow-500', 'bg-emerald-500', 'bg-purple-500'];
+                      const color = colors[i % colors.length];
+                      return (
+                        <div
+                          key={i}
+                          className={`absolute w-2.5 h-2.5 ${color} rounded-sm opacity-0`}
+                          style={{
+                            '--tx': tx,
+                            '--ty': ty,
+                            animation: 'explode 1.5s cubic-bezier(0.25, 1, 0.5, 1) forwards'
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
+
+          {/* 하단 글로벌 커맨드 입력 바 */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl z-20">
+            <form onSubmit={handleCommandSubmit} className="relative flex items-center shadow-2xl group">
+              <MessageCircle className="absolute left-5 w-5 h-5 text-slate-400 group-focus-within:text-indigo-400 transition-colors" />
+              <input
+                type="text"
+                value={commandInput}
+                onChange={e => setCommandInput(e.target.value)}
+                placeholder="업무를 지시하세요 (예: 로그인 페이지 디자인해줘, 리액트 코드 작성해 등)"
+                className="w-full bg-slate-900/95 backdrop-blur-md text-white border border-slate-600 rounded-full pl-12 pr-14 py-4 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 shadow-[0_0_30px_-10px_rgba(99,102,241,0.3)] transition-all font-medium text-sm"
+              />
+              <button 
+                type="submit"
+                disabled={!commandInput.trim()}
+                className="absolute right-2.5 p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white rounded-full transition-colors shadow-lg"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
         </div>
       </div>
 
@@ -1174,6 +1569,18 @@ export default function DevSim() {
             <h2 className="text-xl font-bold text-white tracking-wide">Control Panel</h2>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setIsAutoMode(!isAutoMode);
+                setToastMessage(!isAutoMode ? '24/7 Auto Mode 활성화! 🤖 연속 자동 작업을 시작합니다.' : 'Auto Mode 비활성화 🛑');
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 3000);
+              }}
+              className={`p-2 rounded-lg transition-colors ${isAutoMode ? 'text-emerald-400 bg-emerald-500/20 shadow-[0_0_15px_rgba(52,211,153,0.3)]' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
+              title={isAutoMode ? "Auto Mode 끄기" : "Auto Mode 켜기 (24/7 연속 자동 작업)"}
+            >
+              <Bot className="w-5 h-5" />
+            </button>
             <button
               onClick={handleExportProject}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
@@ -1362,45 +1769,85 @@ export default function DevSim() {
 
         {/* 하단 활동 로그 내역 (Activity Logs) */}
         <div className="bg-slate-900/50 flex flex-col shrink-0" style={{ height: `${logHeight}px` }}>
-          <div className="px-5 py-3 border-b border-slate-700 bg-slate-800/80 flex items-center justify-between">
+          {/* 탭 헤더 */}
+          <div className="px-5 pt-3 border-b border-slate-700 bg-slate-800/80 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <History className="w-4 h-4 text-slate-400" />
-              <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Activity Logs</h3>
+              <button onClick={() => setActiveLogTab('logs')} className={`flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-t-lg border-b-2 transition-colors ${activeLogTab === 'logs' ? 'text-slate-200 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>
+                <History className="w-4 h-4" />
+                Activity Logs
+              </button>
+              <button onClick={() => setActiveLogTab('thinking')} className={`flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-t-lg border-b-2 transition-colors ${activeLogTab === 'thinking' ? 'text-slate-200 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>
+                <BrainCircuit className="w-4 h-4" />
+                Thinking Process
+              </button>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700 shadow-inner">
-                {logs.length}
-              </span>
+              {activeLogTab === 'logs' && (
+                <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700 shadow-inner">
+                  {logs.length}
+                </span>
+              )}
               <button
-                onClick={() => setLogs([])}
+                onClick={() => {
+                  if (activeLogTab === 'logs') {
+                    setLogs([]);
+                  } else if (activeLogTab === 'thinking' && selectedId) {
+                    setThinkingLogs(prev => ({ ...prev, [selectedId]: [] }));
+                  }
+                }}
                 className="p-1 text-slate-500 hover:text-red-400 disabled:text-slate-600 disabled:cursor-not-allowed hover:bg-slate-700 rounded-md transition-colors"
-                title="로그 초기화"
-                disabled={logs.length === 0}
+                title={activeLogTab === 'logs' ? "로그 초기화" : "생각 일지 초기화"}
+                disabled={(activeLogTab === 'logs' && logs.length === 0) || (activeLogTab === 'thinking' && (!selectedId || !thinkingLogs[selectedId] || thinkingLogs[selectedId].length === 0))}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {logs.length > 0 ? (
-              logs.map((log) => (
-                <div key={log.id} className="flex items-start gap-3 text-sm transition-all duration-300">
-                  <div className={`w-2.5 h-2.5 mt-1 rounded-full shrink-0 shadow-lg ${log.color}`} />
-                  <div className="flex-1">
-                    <p className="text-slate-300 leading-snug">
-                      <span className="font-semibold text-white">{log.name}</span>: {log.status}
-                    </p>
-                    <p className="text-[10px] text-slate-500 mt-1">{log.time}</p>
+          {/* 탭 컨텐츠 */}
+          {activeLogTab === 'logs' && (
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {logs.length > 0 ? (
+                logs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-3 text-sm transition-all duration-300">
+                    <div className={`w-2.5 h-2.5 mt-1 rounded-full shrink-0 shadow-lg ${log.color}`} />
+                    <div className="flex-1">
+                      <p className="text-slate-300 leading-snug">
+                        <span className="font-semibold text-white">{log.name}</span>: {log.status}
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-1">{log.time}</p>
+                    </div>
                   </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-2">
+                  <History className="w-8 h-8 opacity-20" />
+                  <p className="text-xs">기록된 활동 로그가 없습니다.</p>
                 </div>
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-2">
-                <History className="w-8 h-8 opacity-20" />
-                <p className="text-xs">기록된 활동 로그가 없습니다.</p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
+          {activeLogTab === 'thinking' && (
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs">
+              {selectedNPC && thinkingLogs[selectedNPC.id] && thinkingLogs[selectedNPC.id].length > 0 ? (
+                thinkingLogs[selectedNPC.id].map((log, index) => (
+                  <div key={index} className="flex items-start gap-3 animate-fade-in">
+                    <span className="text-slate-600 select-none">{log.time}</span>
+                    {log.type === 'system' && <span className="text-purple-400 font-bold select-none">[SYSTEM]</span>}
+                    {log.type === 'user' && <span className="text-blue-400 font-bold select-none">[USER]</span>}
+                    {log.type === 'ai' && <span className="text-emerald-400 font-bold select-none">[AI]</span>}
+                    <p className="text-slate-300 whitespace-pre-wrap flex-1 leading-relaxed">{log.content || '...'}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-3 text-center">
+                  <BrainCircuit className="w-8 h-8 opacity-20" />
+                  <p className="text-sm font-sans">
+                    {selectedNPC ? `[${selectedNPC.name}]에게 작업을 지시하면 이곳에 생각의 흐름이 표시됩니다.` : '에이전트를 선택하고 작업을 지시해주세요.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
