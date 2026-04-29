@@ -2,7 +2,7 @@
   "homepage": "https://[GITHUB_USERNAME].github.io/DevSim",
   "scripts": {
     "dev": "vite",
-    "build": "NODE_OPTIONS=--max_old_space_size=6144 vite build",
+    "build": "NODE_OPTIONS=--max_old_space_size=6144 vite build --debug",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
