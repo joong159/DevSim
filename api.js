@@ -1,4 +1,5 @@
-export const callLLM = async (apiKey, model, systemPrompt, userPrompt, onChunk) => {
+export const callLLM = async (rawApiKey, model, systemPrompt, userPrompt, onChunk) => {
+  const apiKey = (rawApiKey || '').trim(); // API 키 앞뒤의 공백과 줄바꿈을 자동으로 제거
   const targetModel = model || 'gpt-4o';
 
   // 1. Google Gemini API
@@ -121,7 +122,8 @@ export const callLLM = async (apiKey, model, systemPrompt, userPrompt, onChunk) 
   return data.choices[0]?.message?.content;
 };
 
-export const callImageGen = async (apiKey, prompt) => {
+export const callImageGen = async (rawApiKey, prompt) => {
+  const apiKey = (rawApiKey || '').trim();
   const response = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
     headers: {
