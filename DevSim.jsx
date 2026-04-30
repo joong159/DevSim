@@ -144,10 +144,15 @@ export default function DevSim() {
   useEffect(() => {
     const savedKeys = localStorage.getItem('devsim_keys');
     if (savedKeys) {
-      const parsedKeys = JSON.parse(savedKeys);
-      // 기존 llm 키를 openai로 마이그레이션 (하위 호환성 유지)
-      if (parsedKeys.llm && !parsedKeys.openai) parsedKeys.openai = parsedKeys.llm;
-      setApiKeys(parsedKeys);
+      try {
+        const parsedKeys = JSON.parse(savedKeys);
+        // 기존 llm 키를 openai로 마이그레이션 (하위 호환성 유지)
+        if (parsedKeys.llm && !parsedKeys.openai) parsedKeys.openai = parsedKeys.llm;
+        // 기존 키 상태를 유지하면서 병합
+        setApiKeys(prev => ({ ...prev, ...parsedKeys }));
+      } catch (e) {
+        console.error('API Keys parsing error:', e);
+      }
     }
 
     const savedTheme = localStorage.getItem('devsim_theme');
@@ -454,7 +459,7 @@ export default function DevSim() {
     else if (commandInput.match(/영상|비디오|렌더링|애니메이션/)) specialty = 'video';
 
     const newTask = {
-      id: Date.now(),
+      id: Date.now() + Math.random(), // 고속 생성 시 ID 중복(Key Collision) 방지
       title: commandInput,
       specialty,
       status: 'todo',
@@ -888,7 +893,7 @@ export default function DevSim() {
         if (nextTitle && nextSpecialty) {
           setTimeout(() => {
             setTasks(prev => [...prev, {
-              id: Date.now(),
+              id: Date.now() + Math.random(),
               title: nextTitle,
               specialty: nextSpecialty,
               status: 'todo',
