@@ -41,30 +41,28 @@ import {
 import { callLLM, callImageGen } from './api';
 import { sendToSlack, sendToDiscord } from './webhook';
 
-// 사용 가능한 LLM 모델 목록
+// 사용 가능한 LLM 모델 목록 (2026년 최신 기준)
 const availableLLMModels = [
-  // OpenAI
+  // 2026 OpenAI
+  'gpt-5.4',
+  'gpt-5.3-codex',
   'gpt-4o',
-  'gpt-4-turbo',
-  'gpt-3.5-turbo',
-  // Anthropic
-  'claude-3-5-sonnet-20240620',
-  'claude-3-opus-20240229',
-  'claude-3-sonnet-20240229',
-  'claude-3-haiku-20240307',
-  // Google
-  'gemini-1.5-pro-latest',
-  'gemini-1.5-flash-latest',
-  // My Custom Models
-  'my-new-model',
+  // 2026 Anthropic
+  'claude-opus-4.7',
+  'claude-code',
+  // 2026 Google
+  'gemini-3.1-pro',
+  // 2026 xAI & Open Source
+  'grok-4',
+  'deepseek-v4'
 ];
 
-// 초기 NPC 데이터 구성 (특기 및 미디어 역할군 부여)
+// 초기 NPC 데이터 구성 (특기 및 미디어 역할군 부여 - 2026년 모델 적용)
 const initialNPCs = [
-  { id: 1, name: '박팀장', role: 'Project Manager', specialty: 'text', model: 'gpt-4o', apiKey: '', persona: '당신은 10년 차 IT 프로젝트 매니저입니다. 항상 일정을 준수하고 명확하게 소통합니다.', x: 20, y: 30, color: 'bg-blue-500', icon: FileText, status: '휴식 중... ☕' },
-  { id: 2, name: '김개발', role: 'Software Engineer', specialty: 'code', model: 'claude-3-5-sonnet', apiKey: '', persona: '당신은 시니어 프론트엔드 개발자입니다. 클린 코드와 성능 최적화를 중요하게 생각합니다.', x: 60, y: 25, color: 'bg-green-500', icon: Code, status: '휴식 중... ☕' },
-  { id: 3, name: '이픽셀', role: 'UI/UX Designer', specialty: 'image', model: 'dall-e-3', apiKey: '', persona: '당신은 트렌디한 감각을 지닌 UI/UX 디자이너입니다. 사용자 경험을 최우선으로 고려합니다.', x: 75, y: 65, color: 'bg-purple-500', icon: Palette, status: '휴식 중... ☕' },
-  { id: 4, name: '강무비', role: 'Video Creator', specialty: 'video', model: 'sora', apiKey: '', persona: '당신은 감각적인 영상 편집자입니다. 시선을 사로잡는 트랜지션과 효과를 잘 사용합니다.', x: 30, y: 70, color: 'bg-rose-500', icon: Video, status: '휴식 중... ☕' },
+  { id: 1, name: '박팀장', role: 'Project Manager', specialty: 'text', model: 'gpt-5.4', apiKey: '', persona: '당신은 10년 차 IT 프로젝트 매니저입니다. 항상 일정을 준수하고 명확하게 소통합니다.', x: 20, y: 30, color: 'bg-blue-500', icon: FileText, status: '휴식 중... ☕' },
+  { id: 2, name: '김개발', role: 'Software Engineer', specialty: 'code', model: 'claude-opus-4.7', apiKey: '', persona: '당신은 시니어 프론트엔드 개발자입니다. 클린 코드와 성능 최적화를 중요하게 생각합니다.', x: 60, y: 25, color: 'bg-green-500', icon: Code, status: '휴식 중... ☕' },
+  { id: 3, name: '이픽셀', role: 'UI/UX Designer', specialty: 'image', model: 'nano-banana-2', apiKey: '', persona: '당신은 트렌디한 감각을 지닌 UI/UX 디자이너입니다. 사용자 경험을 최우선으로 고려합니다.', x: 75, y: 65, color: 'bg-purple-500', icon: Palette, status: '휴식 중... ☕' },
+  { id: 4, name: '강무비', role: 'Video Creator', specialty: 'video', model: 'sora-2-pro', apiKey: '', persona: '당신은 감각적인 영상 편집자입니다. 시선을 사로잡는 트랜지션과 효과를 잘 사용합니다.', x: 30, y: 70, color: 'bg-rose-500', icon: Video, status: '휴식 중... ☕' },
 ];
 
 // 무작위로 변경될 상태 메시지 목록
@@ -95,7 +93,7 @@ export default function DevSim() {
   
   // 멀티모달 확장 기능 State
   const [showApiModal, setShowApiModal] = useState(false);
-  const [apiKeys, setApiKeys] = useState({ llm: '', image: '', video: '', audio: '', slackWebhookUrl: '', discordWebhookUrl: '' });
+  const [apiKeys, setApiKeys] = useState({ openai: '', anthropic: '', gemini: '', grok: '', deepseek: '', llm: '', image: '', video: '', audio: '', slackWebhookUrl: '', discordWebhookUrl: '' });
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [generatingId, setGeneratingId] = useState(null);
   const [mediaOutputs, setMediaOutputs] = useState({});
@@ -124,6 +122,13 @@ export default function DevSim() {
   const [commandInput, setCommandInput] = useState('');
   const [approvalReq, setApprovalReq] = useState(null); // Human-in-the-loop 상태
   
+  const handleDeleteTask = (taskId) => {
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    setToastMessage('작업이 삭제되었습니다.');
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
   // 24/7 자율 주행(Auto) 모드 State
   const [isAutoMode, setIsAutoMode] = useState(false);
   const isAutoModeRef = useRef(false);
@@ -138,7 +143,12 @@ export default function DevSim() {
   // 로컬 스토리지에서 API 키 및 커스텀 에이전트 데이터 불러오기
   useEffect(() => {
     const savedKeys = localStorage.getItem('devsim_keys');
-    if (savedKeys) setApiKeys(JSON.parse(savedKeys));
+    if (savedKeys) {
+      const parsedKeys = JSON.parse(savedKeys);
+      // 기존 llm 키를 openai로 마이그레이션 (하위 호환성 유지)
+      if (parsedKeys.llm && !parsedKeys.openai) parsedKeys.openai = parsedKeys.llm;
+      setApiKeys(parsedKeys);
+    }
 
     const savedTheme = localStorage.getItem('devsim_theme');
     if (savedTheme) setTheme(savedTheme);
@@ -519,9 +529,17 @@ export default function DevSim() {
 
     // 이전 에이전트들의 결과물을 바탕으로 협업(조합) 로직 수행
     if (npc.specialty === 'text' || npc.specialty === 'code') {
-      const apiKey = npc.apiKey || apiKeys.llm;
+      let globalKey = apiKeys.llm;
+      const modelName = npc.model.toLowerCase();
+      if (modelName.includes('claude')) globalKey = apiKeys.anthropic || apiKeys.llm;
+      else if (modelName.includes('gemini')) globalKey = apiKeys.gemini || apiKeys.llm;
+      else if (modelName.includes('grok')) globalKey = apiKeys.grok || apiKeys.llm;
+      else if (modelName.includes('deepseek')) globalKey = apiKeys.deepseek || apiKeys.llm;
+      else if (modelName.includes('gpt') || modelName.includes('o1')) globalKey = apiKeys.openai || apiKeys.llm;
+
+      const apiKey = npc.apiKey || globalKey;
       if (!apiKey) {
-        alert('LLM API 키가 설정되지 않았습니다. 전역 API 키 또는 에이전트 개별 API 키를 설정해주세요.');
+        alert(`[${npc.model}] 모델을 위한 API 키가 설정되지 않았습니다. 전역 API 설정 또는 에이전트 개별 API 키를 확인해주세요.`);
         setGeneratingId(null);
         return;
       }
@@ -602,11 +620,14 @@ export default function DevSim() {
       setApprovalReq(null);
 
       if (!isApproved) {
-        addThinkingLog(npc.id, { type: 'system', content: '작업이 반려되었습니다. 칸반 보드로 작업을 되돌립니다.' });
+        addThinkingLog(npc.id, { type: 'system', content: '작업이 반려되어 칸반 보드에서 제거됩니다.' });
+        setToastMessage(`[${npc.name}]님의 작업이 반려되어 제거되었습니다.`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
         setGeneratingId(null);
         setActiveConnection(null);
         setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '작업 반려됨 🛑' } : n));
-        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+        if (linkedTask) setTasks(prev => prev.filter(t => t.id !== linkedTask.id));
         return;
       }
 
@@ -637,7 +658,7 @@ export default function DevSim() {
       }
     } else if (npc.specialty === 'image') {
       // 개별 API 키 우선 적용, 없으면 전역 Image 키, 없으면 전역 LLM 키 사용
-      const apiKey = npc.apiKey || apiKeys.image || apiKeys.llm; 
+      const apiKey = npc.apiKey || apiKeys.image || apiKeys.openai || apiKeys.llm; 
       if (!apiKey) {
         alert('API 키가 설정되지 않았습니다. 전역 API 키 또는 에이전트 개별 API 키를 설정해주세요.');
         setGeneratingId(null);
@@ -679,10 +700,13 @@ export default function DevSim() {
       setApprovalReq(null);
 
       if (!isApproved) {
+        setToastMessage(`[${npc.name}]님의 작업이 반려되어 제거되었습니다.`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
         setGeneratingId(null);
         setActiveConnection(null);
         setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '작업 반려됨 🛑' } : n));
-        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+        if (linkedTask) setTasks(prev => prev.filter(t => t.id !== linkedTask.id));
         return;
       }
       setGeneratingMessage(message);
@@ -727,7 +751,7 @@ export default function DevSim() {
     if (npc.specialty === 'video') {
       await new Promise(resolve => setTimeout(resolve, 2500));
       try {
-        const apiKey = npc.apiKey || apiKeys.video || apiKeys.llm;
+        const apiKey = npc.apiKey || apiKeys.video || apiKeys.openai || apiKeys.llm;
         if (!apiKey) {
           alert('Video API 키가 설정되지 않았습니다. 설정 모달에서 Video API 키를 입력해주세요.');
           setGeneratingId(null);
@@ -759,10 +783,13 @@ export default function DevSim() {
         setApprovalReq(null);
 
         if (!isApproved) {
+          setToastMessage(`[${npc.name}]님의 작업이 반려되어 제거되었습니다.`);
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
           setGeneratingId(null);
           setActiveConnection(null);
           setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '작업 반려됨 🛑' } : n));
-          if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+          if (linkedTask) setTasks(prev => prev.filter(t => t.id !== linkedTask.id));
           return;
         }
         setGeneratingMessage(message);
@@ -1047,16 +1074,73 @@ export default function DevSim() {
             </div>
             
             <div className="space-y-6 relative z-10">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-300 flex items-center gap-2"><Bot className="w-4 h-4 text-emerald-400" /> LLM API Key</label>
-                <input 
-                  type="password"
-                  value={apiKeys.llm}
-                  onChange={(e) => setApiKeys({...apiKeys, llm: e.target.value})}
-                  className="w-full bg-slate-900/50 text-white border border-slate-600 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner placeholder:text-slate-600"
-                  placeholder="sk-..."
-                />
-                <p className="text-xs text-slate-500 ml-1">OpenAI, Claude, Gemini 등 주력 텍스트/코드 생성 모델용</p>
+              <div className="space-y-3 bg-slate-900/40 p-4 rounded-xl border border-slate-700">
+                <label className="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-1"><Bot className="w-4 h-4 text-emerald-400" /> LLM (텍스트/코드) API 키</label>
+                
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-400 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div> OpenAI (ChatGPT)
+                  </label>
+                  <input 
+                    type="password"
+                    value={apiKeys.openai || ''}
+                    onChange={(e) => setApiKeys({...apiKeys, openai: e.target.value})}
+                    className="w-full bg-slate-900/80 text-white border border-slate-600 rounded-lg px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner text-sm placeholder:text-slate-600"
+                    placeholder="sk-proj-..."
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-400 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-amber-500"></div> Anthropic (Claude)
+                  </label>
+                  <input 
+                    type="password"
+                    value={apiKeys.anthropic || ''}
+                    onChange={(e) => setApiKeys({...apiKeys, anthropic: e.target.value})}
+                    className="w-full bg-slate-900/80 text-white border border-slate-600 rounded-lg px-3 py-2.5 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all shadow-inner text-sm placeholder:text-slate-600"
+                    placeholder="sk-ant-..."
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-400 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div> Google (Gemini)
+                  </label>
+                  <input 
+                    type="password"
+                    value={apiKeys.gemini || ''}
+                    onChange={(e) => setApiKeys({...apiKeys, gemini: e.target.value})}
+                    className="w-full bg-slate-900/80 text-white border border-slate-600 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-inner text-sm placeholder:text-slate-600"
+                    placeholder="AIzaSy..."
+                  />
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-400 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-slate-100"></div> xAI (Grok)
+                  </label>
+                  <input 
+                    type="password"
+                    value={apiKeys.grok || ''}
+                    onChange={(e) => setApiKeys({...apiKeys, grok: e.target.value})}
+                    className="w-full bg-slate-900/80 text-white border border-slate-600 rounded-lg px-3 py-2.5 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition-all shadow-inner text-sm placeholder:text-slate-600"
+                    placeholder="xai-..."
+                  />
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-400 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-400"></div> DeepSeek
+                  </label>
+                  <input 
+                    type="password"
+                    value={apiKeys.deepseek || ''}
+                    onChange={(e) => setApiKeys({...apiKeys, deepseek: e.target.value})}
+                    className="w-full bg-slate-900/80 text-white border border-slate-600 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all shadow-inner text-sm placeholder:text-slate-600"
+                    placeholder="sk-..."
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-300 flex items-center gap-2"><Palette className="w-4 h-4 text-pink-400" /> Image Generation API Key</label>
@@ -1249,11 +1333,11 @@ export default function DevSim() {
                 <LayoutList className="w-4 h-4 text-indigo-400" /> Task Board
               </span>
             </div>
-            <div className="p-3 overflow-y-auto flex-1 space-y-2 custom-scrollbar">
+            <div className="p-3 overflow-y-auto flex-1 space-y-2">
               {tasks.map(task => (
-                <div key={task.id} className="bg-slate-800/90 border border-slate-600 p-2.5 rounded-lg shadow-sm">
+                <div key={task.id} className="relative group bg-slate-800/90 border border-slate-600 p-2.5 rounded-lg shadow-sm">
                   <div className="flex justify-between items-start mb-1">
-                    <span className="text-xs font-bold text-slate-300 break-words flex-1 pr-2 leading-tight">{task.title}</span>
+                    <span className="text-xs font-bold text-slate-300 break-words flex-1 pr-4 leading-tight">{task.title}</span>
                     <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
                       task.status === 'todo' ? 'bg-slate-700 text-slate-400' :
                       task.status === 'in-progress' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-emerald-500/20 text-emerald-400'
@@ -1268,6 +1352,13 @@ export default function DevSim() {
                     </span>
                     {task.status === 'done' && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
                   </div>
+                  <button
+                    onClick={() => handleDeleteTask(task.id)}
+                    className="absolute top-1 right-1 p-0.5 text-slate-500 hover:text-red-400 bg-slate-800/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="작업 삭제"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </div>
               ))}
               {tasks.length === 0 && <p className="text-xs text-slate-500 text-center py-4">등록된 작업이 없습니다.</p>}
