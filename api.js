@@ -21,8 +21,7 @@ export const callLLM = async (apiKey, model, systemPrompt, userPrompt) => {
   }
   
   const data = await response.json();
-  // 응답 배열 방어코드 적용
-  return data.choices[0]?.message?.content || data.choices?.message?.content;
+  return data.choices[0]?.message?.content;
 };
 
 export const callImageGen = async (apiKey, prompt) => {

@@ -41,6 +41,24 @@ import {
 import { callLLM, callImageGen } from './api';
 import { sendToSlack, sendToDiscord } from './webhook';
 
+// 사용 가능한 LLM 모델 목록
+const availableLLMModels = [
+  // OpenAI
+  'gpt-4o',
+  'gpt-4-turbo',
+  'gpt-3.5-turbo',
+  // Anthropic
+  'claude-3-5-sonnet-20240620',
+  'claude-3-opus-20240229',
+  'claude-3-sonnet-20240229',
+  'claude-3-haiku-20240307',
+  // Google
+  'gemini-1.5-pro-latest',
+  'gemini-1.5-flash-latest',
+  // My Custom Models
+  'my-new-model',
+];
+
 // 초기 NPC 데이터 구성 (특기 및 미디어 역할군 부여)
 const initialNPCs = [
   { id: 1, name: '박팀장', role: 'Project Manager', specialty: 'text', model: 'gpt-4o', apiKey: '', persona: '당신은 10년 차 IT 프로젝트 매니저입니다. 항상 일정을 준수하고 명확하게 소통합니다.', x: 20, y: 30, color: 'bg-blue-500', icon: FileText, status: '휴식 중... ☕' },
@@ -1694,13 +1712,26 @@ export default function DevSim() {
                   {/* API 모델 */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Bot className="w-3.5 h-3.5"/> AI 모델</label>
-                    <input 
-                      type="text"
-                      value={editingAgent.model} 
-                      onChange={(e) => setEditingAgent({...editingAgent, model: e.target.value})}
-                      className="w-full bg-slate-800 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
-                      placeholder="예: gpt-4o"
-                    />
+                    {(editingAgent.specialty === 'text' || editingAgent.specialty === 'code') ? (
+                      <select
+                        value={editingAgent.model}
+                        onChange={(e) => setEditingAgent({...editingAgent, model: e.target.value})}
+                        className="w-full bg-slate-800 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors appearance-none"
+                        style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
+                      >
+                        {availableLLMModels.map(modelName => (
+                          <option key={modelName} value={modelName}>{modelName}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input 
+                        type="text"
+                        value={editingAgent.model} 
+                        onChange={(e) => setEditingAgent({...editingAgent, model: e.target.value})}
+                        className="w-full bg-slate-800 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
+                        placeholder="예: dall-e-3"
+                      />
+                    )}
                   </div>
 
                   {/* 개별 API 키 (선택사항) */}
