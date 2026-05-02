@@ -542,10 +542,18 @@ export default function DevSim() {
       else if (modelName.includes('deepseek')) globalKey = apiKeys.deepseek || apiKeys.llm;
       else if (modelName.includes('gpt') || modelName.includes('o1')) globalKey = apiKeys.openai || apiKeys.llm;
 
-      const apiKey = npc.apiKey || globalKey;
+      const apiKey = (npc.apiKey || globalKey || '').trim();
       if (!apiKey) {
         alert(`[${npc.model}] 모델을 위한 API 키가 설정되지 않았습니다. 전역 API 설정 또는 에이전트 개별 API 키를 확인해주세요.`);
         setGeneratingId(null);
+        return;
+      }
+      if (!/^[\x00-\x7F]*$/.test(apiKey)) {
+        alert(`[${npc.model}] API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
+        setGeneratingId(null);
+        setActiveConnection(null);
+        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
+        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
         return;
       }
 
@@ -663,10 +671,18 @@ export default function DevSim() {
       }
     } else if (npc.specialty === 'image') {
       // 개별 API 키 우선 적용, 없으면 전역 Image 키, 없으면 전역 LLM 키 사용
-      const apiKey = npc.apiKey || apiKeys.image || apiKeys.openai || apiKeys.llm; 
+      const apiKey = (npc.apiKey || apiKeys.image || apiKeys.openai || apiKeys.llm || '').trim(); 
       if (!apiKey) {
         alert('API 키가 설정되지 않았습니다. 전역 API 키 또는 에이전트 개별 API 키를 설정해주세요.');
         setGeneratingId(null);
+        return;
+      }
+      if (!/^[\x00-\x7F]*$/.test(apiKey)) {
+        alert(`API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
+        setGeneratingId(null);
+        setActiveConnection(null);
+        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
+        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
         return;
       }
 
@@ -756,12 +772,20 @@ export default function DevSim() {
     if (npc.specialty === 'video') {
       await new Promise(resolve => setTimeout(resolve, 2500));
       try {
-        const apiKey = npc.apiKey || apiKeys.video || apiKeys.openai || apiKeys.llm;
+        const apiKey = (npc.apiKey || apiKeys.video || apiKeys.openai || apiKeys.llm || '').trim();
         if (!apiKey) {
           alert('Video API 키가 설정되지 않았습니다. 설정 모달에서 Video API 키를 입력해주세요.');
           setGeneratingId(null);
           setActiveConnection(null);
           setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
+          return;
+        }
+        if (!/^[\x00-\x7F]*$/.test(apiKey)) {
+          alert(`Video API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
+          setGeneratingId(null);
+          setActiveConnection(null);
+          setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
+          if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
           return;
         }
 
