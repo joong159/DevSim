@@ -499,10 +499,11 @@ export default function DevSim() {
       if (taskAssigned) setTasks(newTasks);
     }, 1500);
     return () => clearTimeout(assignTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, npcs, isPaused, generatingId, approvalReq]);
 
   // 미디어 생성 시뮬레이션 핸들러
-  const handleGenerate = async (npc, linkedTask = null) => {
+  async function handleGenerate(npc, linkedTask = null) {
     setGeneratingId(npc.id);
 
     // '생각 일지' 기록을 위한 헬퍼 함수
@@ -958,10 +959,10 @@ export default function DevSim() {
   };
 
   // 웹훅 알림 통합 핸들러
-  const handleWebhookNotifications = (npc, output) => {
+  function handleWebhookNotifications(npc, output) {
     sendToSlack(apiKeys.slackWebhookUrl, npc, output);
     sendToDiscord(apiKeys.discordWebhookUrl, npc, output);
-  };
+  }
 
   // 미디어 다운로드 핸들러
   const handleDownloadMedia = async (e, url, type) => {
