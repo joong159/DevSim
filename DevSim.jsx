@@ -358,7 +358,7 @@ export default function DevSim() {
           return { ...npc, x: newX, y: newY, status: newStatus };
         })
       );
-    }, 3000); // 3초 간격으로 위치 업데이트
+      }, 2500); // 2.5초 간격으로 개별 이동 평가
 
     return () => clearInterval(interval);
   }, [isPaused]);
@@ -493,6 +493,7 @@ export default function DevSim() {
           newTasks[taskIdx] = { ...taskToAssign, status: 'in-progress', assignee: npc.name };
           taskAssigned = true;
           handleGenerate(npc, taskToAssign); // 에이전트가 작업을 스스로 픽업!
+              break; // 한 번에 하나의 작업만 할당하여 상태 중첩 방지
         }
       }
       if (taskAssigned) setTasks(newTasks);
@@ -624,13 +625,16 @@ export default function DevSim() {
       await new Promise(r => setTimeout(r, 500));
 
       // Human-in-the-Loop: 작업 진행 전 승인 절차
-      setGeneratingMessage('사용자 결재 대기 중 ✋');
-      addThinkingLog(npc.id, { type: 'system', content: '사용자 승인(Human-in-the-Loop) 대기 중...' });
-      
-      const isApproved = await new Promise((resolve) => {
-        setApprovalReq({ npc, prompt: userPrompt, resolve });
-      });
-      setApprovalReq(null);
+      let isApproved = true;
+      if (!isAutoModeRef.current) {
+        setGeneratingMessage('사용자 결재 대기 중 ✋');
+        addThinkingLog(npc.id, { type: 'system', content: '사용자 승인(Human-in-the-Loop) 대기 중...' });
+        
+        isApproved = await new Promise((resolve) => {
+          setApprovalReq({ npc, prompt: userPrompt, resolve });
+        });
+        setApprovalReq(null);
+      }
 
       if (!isApproved) {
         addThinkingLog(npc.id, { type: 'system', content: '작업이 반려되어 칸반 보드에서 제거됩니다.' });
@@ -686,8 +690,9 @@ export default function DevSim() {
         return;
       }
 
-      if (mediaOutputs[1]) {
-        sourceId = 1;
+      const textOutputEntry = Object.entries(mediaOutputs).find(([_, m]) => m.type === 'text');
+      if (textOutputEntry) {
+        sourceId = Number(textOutputEntry[0]);
         message = '기획안 컨셉에 맞춰 브랜드 이미지 생성 중 (DALL-E 3)... 🎨';
         completionStatus = '컨셉 맞춤 이미지 렌더링 완료! 🖼️';
       } else {
@@ -709,16 +714,19 @@ export default function DevSim() {
 
       // 박팀장의 기획안 결과물이 있다면 이를 포함하여 프롬프트 작성
       let userPrompt = linkedTask ? linkedTask.title : "IT 서비스에 어울리는 트렌디하고 세련된 브랜드 로고나 일러스트를 그려줘. 깔끔하고 직관적인 디자인으로.";
-      if (mediaOutputs[1]) {
-        userPrompt += `\n\n다음 기획안 컨셉을 적극 반영해줘:\n${mediaOutputs[1].content}`;
+      if (textOutputEntry) {
+        userPrompt += `\n\n다음 기획안 컨셉을 적극 반영해줘:\n${textOutputEntry[1].content}`;
       }
 
       // Human-in-the-Loop 컨펌
-      setGeneratingMessage('사용자 결재 대기 중 ✋');
-      const isApproved = await new Promise((resolve) => {
-        setApprovalReq({ npc, prompt: userPrompt, resolve });
-      });
-      setApprovalReq(null);
+      let isApproved = true;
+      if (!isAutoModeRef.current) {
+        setGeneratingMessage('사용자 결재 대기 중 ✋');
+        isApproved = await new Promise((resolve) => {
+          setApprovalReq({ npc, prompt: userPrompt, resolve });
+        });
+        setApprovalReq(null);
+      }
 
       if (!isApproved) {
         setToastMessage(`[${npc.name}]님의 작업이 반려되어 제거되었습니다.`);
@@ -745,9 +753,11 @@ export default function DevSim() {
         return;
       }
     } else if (npc.specialty === 'video') {
-      if (mediaOutputs[3]) { // 이픽셀(image)의 결과물이 있을 때
-        sourceId = 3;
-        message = '이픽셀님의 이미지를 영상으로 변환 중 (I2V) 🎬';
+      const imageOutputEntry = Object.entries(mediaOutputs).find(([_, m]) => m.type === 'image');
+      if (imageOutputEntry) { // 이미지 결과물이 있을 때
+        sourceId = Number(imageOutputEntry[0]);
+        const sourceNpc = npcs.find(n => n.id === sourceId);
+        message = `${sourceNpc ? sourceNpc.name : '동료'}님의 이미지를 영상으로 변환 중 (I2V) 🎬`;
         completionStatus = '이미지 기반 영상 렌더링 완료! 🎥';
       } else {
         message = '영상 렌더링 중... 🎬';
@@ -794,10 +804,11 @@ export default function DevSim() {
           prompt: "High quality, cinematic, 4k resolution, smooth motion"
         };
         
-        // 이픽셀의 결과물(이미지)가 있으면 Image-to-Video 프롬프트로 구성
-        if (mediaOutputs[3]) {
+        // 이미지 결과물이 있으면 Image-to-Video 프롬프트로 구성
+        const imageOutputEntry = Object.entries(mediaOutputs).find(([_, m]) => m.type === 'image');
+        if (imageOutputEntry) {
           requestBody.keyframes = {
-            frame0: { type: "image", url: mediaOutputs[3].content }
+            frame0: { type: "image", url: imageOutputEntry[1].content }
           };
           requestBody.prompt = "Animate this image with cinematic camera pan, high quality";
         }
@@ -805,11 +816,14 @@ export default function DevSim() {
         if (linkedTask) requestBody.prompt = linkedTask.title;
 
         // Human-in-the-Loop 컨펌
-        setGeneratingMessage('사용자 결재 대기 중 ✋');
-        const isApproved = await new Promise((resolve) => {
-          setApprovalReq({ npc, prompt: requestBody.prompt, resolve });
-        });
-        setApprovalReq(null);
+        let isApproved = true;
+        if (!isAutoModeRef.current) {
+          setGeneratingMessage('사용자 결재 대기 중 ✋');
+          isApproved = await new Promise((resolve) => {
+            setApprovalReq({ npc, prompt: requestBody.prompt, resolve });
+          });
+          setApprovalReq(null);
+        }
 
         if (!isApproved) {
           setToastMessage(`[${npc.name}]님의 작업이 반려되어 제거되었습니다.`);
@@ -958,7 +972,7 @@ export default function DevSim() {
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `devsim_${type}_${new Date().getTime()}.png`;
+      link.download = `devsim_${type}_${new Date().getTime()}.${type === 'video' ? 'mp4' : 'png'}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -967,7 +981,7 @@ export default function DevSim() {
       // CORS 등으로 fetch 실패 시 새 창으로 열기 (폴백)
       const link = document.createElement('a');
       link.href = url;
-      link.download = `devsim_${type}_${new Date().getTime()}.png`;
+      link.download = `devsim_${type}_${new Date().getTime()}.${type === 'video' ? 'mp4' : 'png'}`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
@@ -1077,6 +1091,14 @@ export default function DevSim() {
           20% { transform: translate(-50%, -15px) scale(1.2); opacity: 1; }
           80% { transform: translate(-50%, -35px) scale(1); opacity: 1; }
           100% { transform: translate(-50%, -50px) scale(0.8); opacity: 0; }
+        }
+        @keyframes loadingBar {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes rotateAura {
+          0% { transform: translate(-50%, -50%) rotate(0deg); }
+          100% { transform: translate(-50%, -50%) rotate(360deg); }
         }
       `}</style>
 
@@ -1485,7 +1507,7 @@ export default function DevSim() {
                 style={{ 
                   left: `${npc.x}%`, 
                   top: `${npc.y}%`,
-                  transition: draggingId === npc.id ? 'none' : 'left 3s ease-in-out, top 3s ease-in-out' // 드래그 중에는 애니메이션 제거
+              transition: draggingId === npc.id ? 'none' : 'left 4.5s ease-in-out, top 4.5s ease-in-out' // 이동 속도를 늦춰 더 자연스럽게 만듦
                 }}
                 onClick={() => setSelectedId(npc.id)}
                 onMouseDown={(e) => handleMouseDown(e, npc.id)}
@@ -1506,15 +1528,23 @@ export default function DevSim() {
                   </div>
                 )}
 
+                {/* 렌더링 중 화려한 오라(Aura) 효과 */}
+                {generatingId === npc.id && (
+                  <>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-30 animate-ping pointer-events-none"></div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full border-4 border-dashed border-pink-500 border-r-purple-500 border-b-indigo-500 border-l-transparent opacity-70 pointer-events-none" style={{ animation: 'rotateAura 2s linear infinite' }}></div>
+                  </>
+                )}
+
                 {/* 프로그레스 바 (작업 렌더링 중) */}
                 {generatingId === npc.id && (
-                  <div className="absolute bottom-16 px-4 py-2 bg-slate-800 text-slate-200 text-xs font-bold rounded-2xl shadow-xl z-30 flex flex-col items-center gap-2 whitespace-nowrap border border-indigo-500/50">
-                    <span className="flex items-center gap-2 text-indigo-400">
-                      <Loader2 className="w-4 h-4 animate-spin" /> 
+                  <div className="absolute bottom-16 px-4 py-2 bg-slate-800 text-slate-200 text-xs font-bold rounded-2xl shadow-[0_0_20px_rgba(168,85,247,0.4)] z-30 flex flex-col items-center gap-2 whitespace-nowrap border border-purple-500/50">
+                    <span className="flex items-center gap-2 text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                      <Loader2 className="w-4 h-4 animate-spin text-purple-400" /> 
                       {generatingMessage}
                     </span>
-                    <div className="w-24 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-indigo-500 rounded-full w-full animate-pulse"></div>
+                    <div className="w-24 h-1.5 bg-slate-700 rounded-full overflow-hidden relative">
+                      <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" style={{ animation: 'loadingBar 1.5s ease-in-out infinite' }}></div>
                     </div>
                     <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
                   </div>
