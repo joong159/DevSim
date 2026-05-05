@@ -51,18 +51,18 @@ import { sendToSlack, sendToDiscord } from './webhook';
 const modelOptions = {
   text: [
     { value: 'gpt-4o', label: 'OpenAI (GPT-4o)' },
-    { value: 'gpt-5.4', label: 'OpenAI (GPT-5.4)' },
-    { value: 'claude-opus-4.7', label: 'Anthropic (Claude Opus)' },
-    { value: 'gemini-3.1-pro', label: 'Google (Gemini 3.1 Pro)' },
-    { value: 'grok-4', label: 'xAI (Grok 4)' },
-    { value: 'deepseek-v4', label: 'DeepSeek v4' }
+    { value: 'gpt-4-turbo', label: 'OpenAI (GPT-4 Turbo)' },
+    { value: 'claude-3-5-sonnet-20240620', label: 'Anthropic (Claude 3.5 Sonnet)' },
+    { value: 'claude-3-opus-20240229', label: 'Anthropic (Claude 3 Opus)' },
+    { value: 'gemini-1.5-pro', label: 'Google (Gemini 1.5 Pro)' },
+    { value: 'grok-beta', label: 'xAI (Grok Beta)' },
+    { value: 'deepseek-chat', label: 'DeepSeek Chat' }
   ],
   code: [
     { value: 'gpt-4o', label: 'OpenAI (GPT-4o)' },
-    { value: 'gpt-5.3-codex', label: 'OpenAI (Codex)' },
-    { value: 'claude-code', label: 'Anthropic (Claude Code)' },
-    { value: 'gemini-3.1-pro', label: 'Google (Gemini)' },
-    { value: 'deepseek-v4', label: 'DeepSeek Coder' }
+    { value: 'claude-3-5-sonnet-20240620', label: 'Anthropic (Claude 3.5 Sonnet)' },
+    { value: 'gemini-1.5-pro', label: 'Google (Gemini 1.5 Pro)' },
+    { value: 'deepseek-coder', label: 'DeepSeek Coder' }
   ],
   image: [
     { value: 'dall-e-3', label: 'OpenAI (DALL-E 3)' },
@@ -70,7 +70,6 @@ const modelOptions = {
     { value: 'midjourney', label: 'Midjourney' }
   ],
   video: [
-    { value: 'sora-2-pro', label: 'OpenAI (Sora)' },
     { value: 'luma-dream-machine', label: 'Luma AI (Dream Machine)' },
     { value: 'runway-gen3', label: 'Runway (Gen-3)' }
   ]
@@ -120,10 +119,10 @@ const getPreviewHtml = (code) => {
 
 // 초기 NPC 데이터 구성 (특기 및 미디어 역할군 부여 - 2026년 모델 적용)
 const initialNPCs = [
-  { id: 1, name: '박팀장', role: 'Project Manager', specialty: 'text', model: 'gpt-5.4', apiKey: '', persona: '당신은 10년 차 IT 프로젝트 매니저입니다. 항상 일정을 준수하고 명확하게 소통합니다.', x: 20, y: 30, color: 'bg-blue-500', icon: FileText, status: '휴식 중... ☕' },
-  { id: 2, name: '김개발', role: 'Software Engineer', specialty: 'code', model: 'claude-opus-4.7', apiKey: '', persona: '당신은 시니어 프론트엔드 개발자입니다. 클린 코드와 성능 최적화를 중요하게 생각합니다.', x: 60, y: 25, color: 'bg-green-500', icon: Code, status: '휴식 중... ☕' },
+  { id: 1, name: '박팀장', role: 'Project Manager', specialty: 'text', model: 'gpt-4o', apiKey: '', persona: '당신은 10년 차 IT 프로젝트 매니저입니다. 항상 일정을 준수하고 명확하게 소통합니다.', x: 20, y: 30, color: 'bg-blue-500', icon: FileText, status: '휴식 중... ☕' },
+  { id: 2, name: '김개발', role: 'Software Engineer', specialty: 'code', model: 'claude-3-5-sonnet-20240620', apiKey: '', persona: '당신은 시니어 프론트엔드 개발자입니다. 클린 코드와 성능 최적화를 중요하게 생각합니다.', x: 60, y: 25, color: 'bg-green-500', icon: Code, status: '휴식 중... ☕' },
   { id: 3, name: '이픽셀', role: 'UI/UX Designer', specialty: 'image', model: 'stable-diffusion-v3', apiKey: '', persona: '당신은 트렌디한 감각을 지닌 UI/UX 디자이너입니다. 사용자 경험을 최우선으로 고려합니다.', x: 75, y: 65, color: 'bg-purple-500', icon: Palette, status: '휴식 중... ☕' },
-  { id: 4, name: '강무비', role: 'Video Creator', specialty: 'video', model: 'sora-2-pro', apiKey: '', persona: '당신은 감각적인 영상 편집자입니다. 시선을 사로잡는 트랜지션과 효과를 잘 사용합니다.', x: 30, y: 70, color: 'bg-rose-500', icon: Video, status: '휴식 중... ☕' },
+  { id: 4, name: '강무비', role: 'Video Creator', specialty: 'video', model: 'luma-dream-machine', apiKey: '', persona: '당신은 감각적인 영상 편집자입니다. 시선을 사로잡는 트랜지션과 효과를 잘 사용합니다.', x: 30, y: 70, color: 'bg-rose-500', icon: Video, status: '휴식 중... ☕' },
 ];
 
 // 무작위로 변경될 상태 메시지 목록
@@ -500,11 +499,11 @@ export default function DevSim() {
     let apiKey = (chatNpc.apiKey || globalKey || '').trim();
 
     if (!apiKey && !chatNpc.apiKey) {
-      if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-3.1-pro'; }
-      else if (apiKeys.anthropic) { apiKey = apiKeys.anthropic; actualModel = 'claude-opus-4.7'; }
+      if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro'; }
+      else if (apiKeys.anthropic) { apiKey = apiKeys.anthropic; actualModel = 'claude-3-5-sonnet-20240620'; }
       else if (apiKeys.openai) { apiKey = apiKeys.openai; actualModel = 'gpt-4o'; }
-      else if (apiKeys.grok) { apiKey = apiKeys.grok; actualModel = 'grok-4'; }
-      else if (apiKeys.deepseek) { apiKey = apiKeys.deepseek; actualModel = 'deepseek-v4'; }
+      else if (apiKeys.grok) { apiKey = apiKeys.grok; actualModel = 'grok-beta'; }
+      else if (apiKeys.deepseek) { apiKey = apiKeys.deepseek; actualModel = 'deepseek-chat'; }
     }
 
     if (!apiKey) {
@@ -736,11 +735,11 @@ export default function DevSim() {
 
       // [버그 수정] 사용자가 특정 API 키만 입력하고 에이전트 모델을 변경하지 않았을 경우, 입력된 키의 모델로 자동 폴백
       if (!apiKey && !npc.apiKey) {
-        if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-3.1-pro'; }
-        else if (apiKeys.anthropic) { apiKey = apiKeys.anthropic; actualModel = 'claude-opus-4.7'; }
+        if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro'; }
+        else if (apiKeys.anthropic) { apiKey = apiKeys.anthropic; actualModel = 'claude-3-5-sonnet-20240620'; }
         else if (apiKeys.openai) { apiKey = apiKeys.openai; actualModel = 'gpt-4o'; }
-        else if (apiKeys.grok) { apiKey = apiKeys.grok; actualModel = 'grok-4'; }
-        else if (apiKeys.deepseek) { apiKey = apiKeys.deepseek; actualModel = 'deepseek-v4'; }
+        else if (apiKeys.grok) { apiKey = apiKeys.grok; actualModel = 'grok-beta'; }
+        else if (apiKeys.deepseek) { apiKey = apiKeys.deepseek; actualModel = 'deepseek-chat'; }
       }
 
       if (!apiKey) {
