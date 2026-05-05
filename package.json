@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "homepage": "https://[GITHUB_USERNAME].github.io/DevSim",
   "scripts": {
     "dev": "vite",
