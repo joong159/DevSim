@@ -9,6 +9,7 @@ import {
   Terminal,
   Palette,
   Database,
+  Globe,
   MessageSquare,
   History,
   X,
@@ -106,7 +107,7 @@ export default function DevSim() {
   
   // 멀티모달 확장 기능 State
   const [showApiModal, setShowApiModal] = useState(false);
-  const [apiKeys, setApiKeys] = useState({ openai: '', anthropic: '', gemini: '', grok: '', deepseek: '', llm: '', image: '', video: '', audio: '', slackWebhookUrl: '', discordWebhookUrl: '' });
+  const [apiKeys, setApiKeys] = useState({ openai: '', anthropic: '', gemini: '', grok: '', deepseek: '', llm: '', image: '', imageBaseUrl: '', video: '', audio: '', slackWebhookUrl: '', discordWebhookUrl: '' });
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [generatingId, setGeneratingId] = useState(null);
   const [mediaOutputs, setMediaOutputs] = useState({});
@@ -688,7 +689,8 @@ export default function DevSim() {
       addThinkingLog(npc.id, { type: 'ai', content: '' }); // AI 응답을 채워넣을 빈 로그 추가
 
       try {
-        let generatedText = await callLLM(apiKey, npc.model, systemPrompt, userPrompt, handleChunk);
+        const baseUrl = (npc.baseUrl || '').trim();
+        let generatedText = await callLLM(apiKey, actualModel, systemPrompt, userPrompt, handleChunk, baseUrl);
 
         // 마크다운 백틱(```) 제거 방어 로직 (순수 코드만 남기기 위함)
         if (npc.specialty === 'code') {
@@ -784,7 +786,8 @@ export default function DevSim() {
       setGeneratingMessage(message);
 
       try {
-        const imageUrl = await callImageGen(apiKey, userPrompt);
+        const baseUrl = (npc.baseUrl || apiKeys.imageBaseUrl || '').trim();
+        const imageUrl = await callImageGen(apiKey, userPrompt, npc.model, baseUrl);
         output = { type: 'image', content: imageUrl };
       } catch (error) {
         console.error('DALL-E 3 Error:', error);
@@ -829,6 +832,7 @@ export default function DevSim() {
       await new Promise(resolve => setTimeout(resolve, 2500));
       try {
         const apiKey = (npc.apiKey || apiKeys.video || apiKeys.openai || apiKeys.gemini || apiKeys.anthropic || apiKeys.llm || '').trim();
+        const baseUrl = (npc.baseUrl || '').trim();
         if (!apiKey) {
           setToastMessage('Video API 키가 설정되지 않았습니다. 설정 모달에서 Video API 키를 입력해주세요.');
           setShowToast(true);
@@ -890,7 +894,8 @@ export default function DevSim() {
         }
         setGeneratingMessage(message);
 
-        const createRes = await fetch('https://api.lumalabs.ai/dream-machine/v1/generations', {
+        const endpoint = baseUrl || 'https://api.lumalabs.ai/dream-machine/v1/generations';
+        const createRes = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -907,7 +912,7 @@ export default function DevSim() {
         while (true) {
           await new Promise(resolve => setTimeout(resolve, 5000)); // 5초 대기 후 재확인
           
-          const pollRes = await fetch(`https://api.lumalabs.ai/dream-machine/v1/generations/${createData.id}`, {
+          const pollRes = await fetch(`${endpoint}/${createData.id}`, {
             headers: { 'Authorization': `Bearer ${apiKey}` }
           });
           const pollData = await pollRes.json();
@@ -1253,12 +1258,19 @@ export default function DevSim() {
                 <label className="text-sm font-semibold text-slate-300 flex items-center gap-2"><Palette className="w-4 h-4 text-pink-400" /> Image Generation API Key</label>
                 <input 
                   type="password"
-                  value={apiKeys.image}
+                  value={apiKeys.image || ''}
                   onChange={(e) => setApiKeys({...apiKeys, image: e.target.value})}
                   className="w-full bg-slate-900/50 text-white border border-slate-600 rounded-xl px-4 py-3 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all shadow-inner placeholder:text-slate-600"
                   placeholder="LLM 키와 동일하면 비워두세요"
                 />
-                <p className="text-xs text-slate-500 ml-1">DALL-E 3 등 이미지 렌더링을 위한 전용 키 (선택)</p>
+                <input 
+                  type="text"
+                  value={apiKeys.imageBaseUrl || ''}
+                  onChange={(e) => setApiKeys({...apiKeys, imageBaseUrl: e.target.value})}
+                  className="w-full bg-slate-900/50 text-white border border-slate-600 rounded-xl px-4 py-3 mt-2 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all shadow-inner placeholder:text-slate-600"
+                  placeholder="Base URL (예: https://api.midjourney.com/v1) - 선택"
+                />
+                <p className="text-xs text-slate-500 ml-1">비공식 프록시 등 엔드포인트 우회가 필요할 경우 입력하세요.</p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-300 flex items-center gap-2"><Video className="w-4 h-4 text-purple-400" /> Video Generation API Key</label>
@@ -1955,6 +1967,18 @@ export default function DevSim() {
                       onChange={(e) => setEditingAgent({...editingAgent, apiKey: e.target.value})}
                       className="w-full bg-slate-900 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
                       placeholder="비워두면 전역 키를 사용합니다"
+                    />
+                  </div>
+
+                  {/* 개별 Base URL (선택사항) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Globe className="w-3.5 h-3.5"/> 개별 Base URL (선택사항)</label>
+                    <input 
+                      type="text"
+                      value={editingAgent.baseUrl || ''} 
+                      onChange={(e) => setEditingAgent({...editingAgent, baseUrl: e.target.value})}
+                      className="w-full bg-slate-900 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
+                      placeholder="비공식 API 우회 시 입력 (선택)"
                     />
                   </div>
 
