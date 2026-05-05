@@ -41,21 +41,34 @@ import {
 import { callLLM, callImageGen } from './api';
 import { sendToSlack, sendToDiscord } from './webhook';
 
-// 사용 가능한 LLM 모델 목록 (2026년 최신 기준)
-const availableLLMModels = [
-  // 2026 OpenAI
-  'gpt-5.4',
-  'gpt-5.3-codex',
-  'gpt-4o',
-  // 2026 Anthropic
-  'claude-opus-4.7',
-  'claude-code',
-  // 2026 Google
-  'gemini-3.1-pro',
-  // 2026 xAI & Open Source
-  'grok-4',
-  'deepseek-v4'
-];
+// 직군(특기)별 사용 가능한 API 및 모델 목록
+const modelOptions = {
+  text: [
+    { value: 'gpt-4o', label: 'OpenAI (GPT-4o)' },
+    { value: 'gpt-5.4', label: 'OpenAI (GPT-5.4)' },
+    { value: 'claude-opus-4.7', label: 'Anthropic (Claude Opus)' },
+    { value: 'gemini-3.1-pro', label: 'Google (Gemini 3.1 Pro)' },
+    { value: 'grok-4', label: 'xAI (Grok 4)' },
+    { value: 'deepseek-v4', label: 'DeepSeek v4' }
+  ],
+  code: [
+    { value: 'gpt-4o', label: 'OpenAI (GPT-4o)' },
+    { value: 'gpt-5.3-codex', label: 'OpenAI (Codex)' },
+    { value: 'claude-code', label: 'Anthropic (Claude Code)' },
+    { value: 'gemini-3.1-pro', label: 'Google (Gemini)' },
+    { value: 'deepseek-v4', label: 'DeepSeek Coder' }
+  ],
+  image: [
+    { value: 'dall-e-3', label: 'OpenAI (DALL-E 3)' },
+    { value: 'nano-banana-2', label: 'Nano Banana 2' },
+    { value: 'midjourney', label: 'Midjourney' }
+  ],
+  video: [
+    { value: 'sora-2-pro', label: 'OpenAI (Sora)' },
+    { value: 'luma-dream-machine', label: 'Luma AI (Dream Machine)' },
+    { value: 'runway-gen3', label: 'Runway (Gen-3)' }
+  ]
+};
 
 // 초기 NPC 데이터 구성 (특기 및 미디어 역할군 부여 - 2026년 모델 적용)
 const initialNPCs = [
@@ -558,12 +571,19 @@ export default function DevSim() {
       }
 
       if (!apiKey) {
-        alert(`[${actualModel}] 모델을 위한 API 키가 설정되지 않았습니다. 전역 API 설정 또는 에이전트 개별 API 키를 확인해주세요.`);
+        setToastMessage(`[${actualModel}] 모델을 위한 API 키가 설정되지 않았습니다. 전역 API 설정 또는 에이전트 개별 API 키를 확인해주세요.`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setIsPaused(true);
         setGeneratingId(null);
+        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
         return;
       }
       if (!/^[\x00-\x7F]*$/.test(apiKey)) {
-        alert(`[${actualModel}] API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
+        setToastMessage(`[${actualModel}] API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
         setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
@@ -679,7 +699,10 @@ export default function DevSim() {
         addThinkingLog(npc.id, { type: 'system', content: '모델 응답 스트림이 종료되었습니다. 결과물을 정리합니다.' });
       } catch (error) {
         console.error('LLM API Error:', error);
-        alert(`텍스트/코드 생성 실패: ${error.message}`);
+        setToastMessage(`텍스트/코드 생성 실패: ${error.message}`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
         setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
@@ -690,12 +713,19 @@ export default function DevSim() {
       // 개별 API 키 우선 적용, 없으면 전역 Image 키, 없으면 등록된 다른 전역 키 사용
       const apiKey = (npc.apiKey || apiKeys.image || apiKeys.openai || apiKeys.gemini || apiKeys.anthropic || apiKeys.llm || '').trim(); 
       if (!apiKey) {
-        alert('Image 생성 API 키가 설정되지 않았습니다. 전역 API 키 또는 에이전트 개별 API 키를 설정해주세요.');
+        setToastMessage('Image 생성 API 키가 설정되지 않았습니다. 전역 API 키 또는 에이전트 개별 API 키를 설정해주세요.');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setIsPaused(true);
         setGeneratingId(null);
+        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
         return;
       }
       if (!/^[\x00-\x7F]*$/.test(apiKey)) {
-        alert(`API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
+        setToastMessage(`API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
         setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
@@ -758,7 +788,10 @@ export default function DevSim() {
         output = { type: 'image', content: imageUrl };
       } catch (error) {
         console.error('DALL-E 3 Error:', error);
-        alert(`이미지 생성 실패: ${error.message}`);
+        setToastMessage(`이미지 생성 실패: ${error.message}`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
         setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
@@ -797,14 +830,21 @@ export default function DevSim() {
       try {
         const apiKey = (npc.apiKey || apiKeys.video || apiKeys.openai || apiKeys.gemini || apiKeys.anthropic || apiKeys.llm || '').trim();
         if (!apiKey) {
-          alert('Video API 키가 설정되지 않았습니다. 설정 모달에서 Video API 키를 입력해주세요.');
+          setToastMessage('Video API 키가 설정되지 않았습니다. 설정 모달에서 Video API 키를 입력해주세요.');
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
+          setIsPaused(true);
           setGeneratingId(null);
           setActiveConnection(null);
           setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
+          if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
           return;
         }
         if (!/^[\x00-\x7F]*$/.test(apiKey)) {
-          alert(`Video API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
+          setToastMessage(`Video API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
+          setIsPaused(true);
           setGeneratingId(null);
           setActiveConnection(null);
           setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
@@ -887,7 +927,10 @@ export default function DevSim() {
         output = { type: 'video', content: videoUrl };
       } catch (error) {
         console.error('Video API Error:', error);
-        alert(`영상 생성 실패: ${error.message}`);
+        setToastMessage(`영상 생성 실패: ${error.message}`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
         setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
@@ -1872,29 +1915,35 @@ export default function DevSim() {
                     />
                   </div>
 
+                  {/* 주특기 (Specialty) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><BrainCircuit className="w-3.5 h-3.5"/> 주특기 (Specialty)</label>
+                    <select
+                      value={editingAgent.specialty}
+                      onChange={(e) => setEditingAgent({...editingAgent, specialty: e.target.value, model: modelOptions[e.target.value][0].value})}
+                      className="w-full bg-slate-800 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors appearance-none"
+                      style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
+                    >
+                      <option value="text">기획 / 문서 (Text)</option>
+                      <option value="code">개발 / 코드 (Code)</option>
+                      <option value="image">디자인 / 이미지 (Image)</option>
+                      <option value="video">영상 제작 (Video)</option>
+                    </select>
+                  </div>
+
                   {/* API 모델 */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Bot className="w-3.5 h-3.5"/> AI 모델</label>
-                    {(editingAgent.specialty === 'text' || editingAgent.specialty === 'code') ? (
-                      <select
-                        value={editingAgent.model}
-                        onChange={(e) => setEditingAgent({...editingAgent, model: e.target.value})}
-                        className="w-full bg-slate-800 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors appearance-none"
-                        style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
-                      >
-                        {availableLLMModels.map(modelName => (
-                          <option key={modelName} value={modelName}>{modelName}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input 
-                        type="text"
-                        value={editingAgent.model} 
-                        onChange={(e) => setEditingAgent({...editingAgent, model: e.target.value})}
-                        className="w-full bg-slate-800 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors"
-                        placeholder="예: dall-e-3"
-                      />
-                    )}
+                    <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Bot className="w-3.5 h-3.5"/> 연결할 API / 모델</label>
+                    <select
+                      value={editingAgent.model}
+                      onChange={(e) => setEditingAgent({...editingAgent, model: e.target.value})}
+                      className="w-full bg-slate-800 text-white text-sm border border-slate-600 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors appearance-none"
+                      style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
+                    >
+                      {(modelOptions[editingAgent.specialty] || modelOptions.text).map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* 개별 API 키 (선택사항) */}
