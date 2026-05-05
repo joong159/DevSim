@@ -224,3 +224,29 @@ export async function callVideoGen(apiKey, prompt, model = 'luma-dream-machine',
     if (onProgress) onProgress(`영상 렌더링 중... (Luma: ${pollData.state}) 🎬`);
   }
 }
+
+export async function callAudioGen(apiKey, prompt, model = 'tts-1', baseUrl = '') {
+  // OpenAI 호환 TTS (Text-To-Speech) API 연동
+  const endpoint = baseUrl || 'https://api.openai.com/v1/audio/speech';
+  
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: model,
+      input: prompt,
+      voice: 'alloy' // 기본 음성 (alloy, echo, fable, onyx, nova, shimmer 선택 가능)
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || err.message || `오디오 생성 실패: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  return URL.createObjectURL(blob); // 생성된 음성 파일(mp3)의 브라우저 URL 반환
+}
