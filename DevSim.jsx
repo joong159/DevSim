@@ -537,21 +537,33 @@ export default function DevSim() {
     // 이전 에이전트들의 결과물을 바탕으로 협업(조합) 로직 수행
     if (npc.specialty === 'text' || npc.specialty === 'code') {
       let globalKey = apiKeys.llm;
-      const modelName = npc.model.toLowerCase();
+      let actualModel = npc.model;
+      const modelName = actualModel.toLowerCase();
+      
       if (modelName.includes('claude')) globalKey = apiKeys.anthropic || apiKeys.llm;
       else if (modelName.includes('gemini')) globalKey = apiKeys.gemini || apiKeys.llm;
       else if (modelName.includes('grok')) globalKey = apiKeys.grok || apiKeys.llm;
       else if (modelName.includes('deepseek')) globalKey = apiKeys.deepseek || apiKeys.llm;
       else if (modelName.includes('gpt') || modelName.includes('o1')) globalKey = apiKeys.openai || apiKeys.llm;
 
-      const apiKey = (npc.apiKey || globalKey || '').trim();
+      let apiKey = (npc.apiKey || globalKey || '').trim();
+
+      // [버그 수정] 사용자가 특정 API 키만 입력하고 에이전트 모델을 변경하지 않았을 경우, 입력된 키의 모델로 자동 폴백
+      if (!apiKey && !npc.apiKey) {
+        if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-3.1-pro'; }
+        else if (apiKeys.anthropic) { apiKey = apiKeys.anthropic; actualModel = 'claude-opus-4.7'; }
+        else if (apiKeys.openai) { apiKey = apiKeys.openai; actualModel = 'gpt-4o'; }
+        else if (apiKeys.grok) { apiKey = apiKeys.grok; actualModel = 'grok-4'; }
+        else if (apiKeys.deepseek) { apiKey = apiKeys.deepseek; actualModel = 'deepseek-v4'; }
+      }
+
       if (!apiKey) {
-        alert(`[${npc.model}] 모델을 위한 API 키가 설정되지 않았습니다. 전역 API 설정 또는 에이전트 개별 API 키를 확인해주세요.`);
+        alert(`[${actualModel}] 모델을 위한 API 키가 설정되지 않았습니다. 전역 API 설정 또는 에이전트 개별 API 키를 확인해주세요.`);
         setGeneratingId(null);
         return;
       }
       if (!/^[\x00-\x7F]*$/.test(apiKey)) {
-        alert(`[${npc.model}] API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
+        alert(`[${actualModel}] API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
         setGeneratingId(null);
         setActiveConnection(null);
         setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false } : n));
@@ -675,10 +687,10 @@ export default function DevSim() {
         return;
       }
     } else if (npc.specialty === 'image') {
-      // 개별 API 키 우선 적용, 없으면 전역 Image 키, 없으면 전역 LLM 키 사용
-      const apiKey = (npc.apiKey || apiKeys.image || apiKeys.openai || apiKeys.llm || '').trim(); 
+      // 개별 API 키 우선 적용, 없으면 전역 Image 키, 없으면 등록된 다른 전역 키 사용
+      const apiKey = (npc.apiKey || apiKeys.image || apiKeys.openai || apiKeys.gemini || apiKeys.anthropic || apiKeys.llm || '').trim(); 
       if (!apiKey) {
-        alert('API 키가 설정되지 않았습니다. 전역 API 키 또는 에이전트 개별 API 키를 설정해주세요.');
+        alert('Image 생성 API 키가 설정되지 않았습니다. 전역 API 키 또는 에이전트 개별 API 키를 설정해주세요.');
         setGeneratingId(null);
         return;
       }
@@ -694,10 +706,10 @@ export default function DevSim() {
       const textOutputEntry = Object.entries(mediaOutputs).find(([_, m]) => m.type === 'text');
       if (textOutputEntry) {
         sourceId = Number(textOutputEntry[0]);
-        message = '기획안 컨셉에 맞춰 브랜드 이미지 생성 중 (DALL-E 3)... 🎨';
+        message = '기획안 컨셉에 맞춰 브랜드 이미지 생성 중... 🎨';
         completionStatus = '컨셉 맞춤 이미지 렌더링 완료! 🖼️';
       } else {
-        message = '이미지 렌더링 중 (DALL-E 3)... 🎨';
+        message = '이미지 렌더링 중... 🎨';
       }
       if (linkedTask) {
         message = `칸반 이미지 작업 렌더링 중... 🚀`;
@@ -783,7 +795,7 @@ export default function DevSim() {
     if (npc.specialty === 'video') {
       await new Promise(resolve => setTimeout(resolve, 2500));
       try {
-        const apiKey = (npc.apiKey || apiKeys.video || apiKeys.openai || apiKeys.llm || '').trim();
+        const apiKey = (npc.apiKey || apiKeys.video || apiKeys.openai || apiKeys.gemini || apiKeys.anthropic || apiKeys.llm || '').trim();
         if (!apiKey) {
           alert('Video API 키가 설정되지 않았습니다. 설정 모달에서 Video API 키를 입력해주세요.');
           setGeneratingId(null);
