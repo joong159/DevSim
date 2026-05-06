@@ -43,8 +43,12 @@ import {
   Box,
   Monitor,
   FileCode
+  FileCode,
+  Music,
+  Headphones
 } from 'lucide-react';
 import { callLLM, callImageGen, callVideoGen } from './api';
+import { callLLM, callImageGen, callVideoGen, callAudioGen } from './api';
 import { sendToSlack, sendToDiscord } from './webhook';
 
 // 직군(특기)별 사용 가능한 API 및 모델 목록
@@ -55,6 +59,7 @@ const modelOptions = {
     { value: 'claude-3-5-sonnet-20240620', label: 'Anthropic (Claude 3.5 Sonnet)' },
     { value: 'claude-3-opus-20240229', label: 'Anthropic (Claude 3 Opus)' },
     { value: 'gemini-1.5-pro', label: 'Google (Gemini 1.5 Pro)' },
+    { value: 'gemini-1.5-pro-latest', label: 'Google (Gemini 1.5 Pro)' },
     { value: 'grok-beta', label: 'xAI (Grok Beta)' },
     { value: 'deepseek-chat', label: 'DeepSeek Chat' }
   ],
@@ -62,6 +67,7 @@ const modelOptions = {
     { value: 'gpt-4o', label: 'OpenAI (GPT-4o)' },
     { value: 'claude-3-5-sonnet-20240620', label: 'Anthropic (Claude 3.5 Sonnet)' },
     { value: 'gemini-1.5-pro', label: 'Google (Gemini 1.5 Pro)' },
+    { value: 'gemini-1.5-pro-latest', label: 'Google (Gemini 1.5 Pro)' },
     { value: 'deepseek-coder', label: 'DeepSeek Coder' }
   ],
   image: [
@@ -72,6 +78,10 @@ const modelOptions = {
   video: [
     { value: 'luma-dream-machine', label: 'Luma AI (Dream Machine)' },
     { value: 'runway-gen3', label: 'Runway (Gen-3)' }
+  ],
+  audio: [
+    { value: 'tts-1', label: 'OpenAI (TTS-1)' },
+    { value: 'tts-1-hd', label: 'OpenAI (TTS-1-HD)' }
   ]
 };
 
@@ -123,6 +133,7 @@ const initialNPCs = [
   { id: 2, name: '김개발', role: 'Software Engineer', specialty: 'code', model: 'claude-3-5-sonnet-20240620', apiKey: '', persona: '당신은 시니어 프론트엔드 개발자입니다. 클린 코드와 성능 최적화를 중요하게 생각합니다.', x: 60, y: 25, color: 'bg-green-500', icon: Code, status: '휴식 중... ☕' },
   { id: 3, name: '이픽셀', role: 'UI/UX Designer', specialty: 'image', model: 'stable-diffusion-v3', apiKey: '', persona: '당신은 트렌디한 감각을 지닌 UI/UX 디자이너입니다. 사용자 경험을 최우선으로 고려합니다.', x: 75, y: 65, color: 'bg-purple-500', icon: Palette, status: '휴식 중... ☕' },
   { id: 4, name: '강무비', role: 'Video Creator', specialty: 'video', model: 'luma-dream-machine', apiKey: '', persona: '당신은 감각적인 영상 편집자입니다. 시선을 사로잡는 트랜지션과 효과를 잘 사용합니다.', x: 30, y: 70, color: 'bg-rose-500', icon: Video, status: '휴식 중... ☕' },
+  { id: 5, name: '사운드최', role: 'Audio Director', specialty: 'audio', model: 'tts-1', apiKey: '', persona: '당신은 텍스트를 감미로운 음성으로 변환하는 오디오 엔지니어입니다.', x: 45, y: 85, color: 'bg-amber-500', icon: Music, status: '휴식 중... ☕' },
 ];
 
 // 무작위로 변경될 상태 메시지 목록
@@ -500,6 +511,7 @@ export default function DevSim() {
 
     if (!apiKey && !chatNpc.apiKey) {
       if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro'; }
+      if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro-latest'; }
       else if (apiKeys.anthropic) { apiKey = apiKeys.anthropic; actualModel = 'claude-3-5-sonnet-20240620'; }
       else if (apiKeys.openai) { apiKey = apiKeys.openai; actualModel = 'gpt-4o'; }
       else if (apiKeys.grok) { apiKey = apiKeys.grok; actualModel = 'grok-beta'; }
@@ -585,6 +597,8 @@ export default function DevSim() {
           markdown += `!Generated Image\n\n`;
         } else if (output.type === 'video') {
           markdown += `🎥 비디오 결과물 링크 (클릭하여 확인)\n\n`;
+        } else if (output.type === 'audio') {
+          markdown += `🎵 오디오 결과물 (음성 파일 생성됨)\n\n`;
         }
         markdown += `---\n\n`;
       }
@@ -642,6 +656,7 @@ export default function DevSim() {
     if (commandInput.match(/코드|개발|구현|API|에러|버그|UI/)) specialty = 'code';
     else if (commandInput.match(/이미지|디자인|로고|그림/)) specialty = 'image';
     else if (commandInput.match(/영상|비디오|렌더링|애니메이션/)) specialty = 'video';
+    else if (commandInput.match(/음성|오디오|목소리|읽어줘|TTS/)) specialty = 'audio';
 
     const newTask = {
       id: Date.now() + Math.random(), // 고속 생성 시 ID 중복(Key Collision) 방지
@@ -736,6 +751,7 @@ export default function DevSim() {
       // [버그 수정] 사용자가 특정 API 키만 입력하고 에이전트 모델을 변경하지 않았을 경우, 입력된 키의 모델로 자동 폴백
       if (!apiKey && !npc.apiKey) {
         if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro'; }
+        if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro-latest'; }
         else if (apiKeys.anthropic) { apiKey = apiKeys.anthropic; actualModel = 'claude-3-5-sonnet-20240620'; }
         else if (apiKeys.openai) { apiKey = apiKeys.openai; actualModel = 'gpt-4o'; }
         else if (apiKeys.grok) { apiKey = apiKeys.grok; actualModel = 'grok-beta'; }
@@ -1081,6 +1097,83 @@ export default function DevSim() {
         if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
         return;
       }
+    } else if (npc.specialty === 'audio') {
+      const apiKey = (npc.apiKey || apiKeys.audio || apiKeys.openai || apiKeys.llm || '').trim();
+      const baseUrl = (npc.baseUrl || '').trim();
+      if (!apiKey) {
+        setToastMessage('Audio API 키가 설정되지 않았습니다. 전역 API 키를 확인해주세요.');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setIsPaused(true);
+        setGeneratingId(null);
+        setActiveConnection(null);
+        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, x: n.prevX || n.x, y: n.prevY || n.y } : n));
+        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+        return;
+      }
+
+      const textOutputEntry = Object.entries(mediaOutputs).find(([_, m]) => m.type === 'text');
+      if (textOutputEntry) {
+        sourceId = Number(textOutputEntry[0]);
+        message = '작성된 문서를 음성으로 변환 중 (TTS)... 🎵';
+        completionStatus = '텍스트 음성 변환 완료! 🎙️';
+      } else {
+        message = '오디오 합성 중... 🎵';
+        completionStatus = '음성 파일 렌더링 완료! 🎙️';
+      }
+      
+      if (linkedTask) message = `칸반 오디오 작업 렌더링 중... 🚀`;
+
+      if (sourceId) setActiveConnection({ source: sourceId, target: npc.id });
+      setGeneratingMessage(message);
+
+      setNpcs(curr => curr.map(n => {
+        if (n.id === npc.id) return { ...n, isBusy: true, prevX: n.x, prevY: n.y, x: sourceId ? 65 : 50, y: 50 };
+        if (sourceId && n.id === sourceId) return { ...n, isBusy: true, prevX: n.x, prevY: n.y, x: 35, y: 50 };
+        return n;
+      }));
+
+      let userPrompt = linkedTask ? linkedTask.title : "안녕하세요, 저는 당신의 텍스트를 목소리로 읽어주는 에이전트입니다.";
+      if (textOutputEntry) {
+        userPrompt = textOutputEntry[1].content.slice(0, 3000); // TTS 최대 길이 방어
+      }
+
+      let isApproved = true;
+      if (!isAutoModeRef.current) {
+        setGeneratingMessage('사용자 결재 대기 중 ✋');
+        isApproved = await new Promise((resolve) => {
+          setApprovalReq({ npc, prompt: userPrompt, resolve });
+        });
+        setApprovalReq(null);
+      }
+
+      if (!isApproved) {
+        setToastMessage(`[${npc.name}]님의 작업이 반려되어 제거되었습니다.`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setGeneratingId(null);
+        setActiveConnection(null);
+        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '작업 반려됨 🛑', x: n.prevX || n.x, y: n.prevY || n.y } : n));
+        if (linkedTask) setTasks(prev => prev.filter(t => t.id !== linkedTask.id));
+        return;
+      }
+      setGeneratingMessage(message);
+
+      try {
+        const audioUrl = await callAudioGen(apiKey, userPrompt, npc.model, baseUrl);
+        output = { type: 'audio', content: audioUrl };
+      } catch (error) {
+        console.error('Audio API Error:', error);
+        setToastMessage(`오디오 생성 실패: ${error.message}`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setIsPaused(true);
+        setGeneratingId(null);
+        setActiveConnection(null);
+        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, x: n.prevX || n.x, y: n.prevY || n.y } : n));
+        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+        return;
+      }
     }
 
     setGeneratingId(null);
@@ -1180,6 +1273,7 @@ export default function DevSim() {
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = `devsim_${type}_${new Date().getTime()}.${type === 'video' ? 'mp4' : 'png'}`;
+      link.download = `devsim_${type}_${new Date().getTime()}.${type === 'video' ? 'mp4' : type === 'audio' ? 'mp3' : 'png'}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1189,6 +1283,7 @@ export default function DevSim() {
       const link = document.createElement('a');
       link.href = url;
       link.download = `devsim_${type}_${new Date().getTime()}.${type === 'video' ? 'mp4' : 'png'}`;
+      link.download = `devsim_${type}_${new Date().getTime()}.${type === 'video' ? 'mp4' : type === 'audio' ? 'mp3' : 'png'}`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
@@ -1502,6 +1597,16 @@ export default function DevSim() {
                 <p className="text-xs text-slate-500 ml-1">Luma AI 등 비디오 렌더링을 위한 전용 키</p>
               </div>
               <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-300 flex items-center gap-2"><Music className="w-4 h-4 text-amber-400" /> Audio/TTS API Key (선택)</label>
+                <input 
+                  type="password"
+                  value={apiKeys.audio || ''}
+                  onChange={(e) => setApiKeys({...apiKeys, audio: e.target.value})}
+                  className="w-full bg-slate-900/50 text-white border border-slate-600 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all shadow-inner placeholder:text-slate-600"
+                  placeholder="LLM (OpenAI) 키와 동일하면 비워두세요"
+                />
+              </div>
+              <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-300 flex items-center gap-2"><Send className="w-4 h-4 text-cyan-400" /> Slack Webhook URL (선택)</label>
                 <input 
                   type="text"
@@ -1546,10 +1651,17 @@ export default function DevSim() {
                 <div className="bg-slate-800 p-2 rounded-lg border border-slate-600"><div className="text-xs text-slate-400 mb-1">개발 (Code)</div><div className="text-lg font-bold text-white">{apiUsage.code || 0}</div></div>
                 <div className="bg-slate-800 p-2 rounded-lg border border-slate-600"><div className="text-xs text-slate-400 mb-1">이미지 (Image)</div><div className="text-lg font-bold text-white">{apiUsage.image || 0}</div></div>
                 <div className="bg-slate-800 p-2 rounded-lg border border-slate-600"><div className="text-xs text-slate-400 mb-1">영상 (Video)</div><div className="text-lg font-bold text-white">{apiUsage.video || 0}</div></div>
+              <div className="grid grid-cols-5 gap-2 text-center">
+                <div className="bg-slate-800 p-1.5 rounded-lg border border-slate-600"><div className="text-[10px] text-slate-400 mb-1">기획</div><div className="text-base font-bold text-white">{apiUsage.text || 0}</div></div>
+                <div className="bg-slate-800 p-1.5 rounded-lg border border-slate-600"><div className="text-[10px] text-slate-400 mb-1">개발</div><div className="text-base font-bold text-white">{apiUsage.code || 0}</div></div>
+                <div className="bg-slate-800 p-1.5 rounded-lg border border-slate-600"><div className="text-[10px] text-slate-400 mb-1">이미지</div><div className="text-base font-bold text-white">{apiUsage.image || 0}</div></div>
+                <div className="bg-slate-800 p-1.5 rounded-lg border border-slate-600"><div className="text-[10px] text-slate-400 mb-1">영상</div><div className="text-base font-bold text-white">{apiUsage.video || 0}</div></div>
+                <div className="bg-slate-800 p-1.5 rounded-lg border border-slate-600"><div className="text-[10px] text-slate-400 mb-1">음성</div><div className="text-base font-bold text-white">{apiUsage.audio || 0}</div></div>
               </div>
               <div className="flex justify-between items-center mt-3">
                 <p className="text-[10px] text-slate-500">※ 이 수치는 현재 브라우저에서 실행된 성공적인 호출 횟수입니다. 정확한 비용은 각 API 대시보드에서 확인하세요.</p>
                 <button onClick={() => { if(window.confirm('사용량 기록을 초기화하시겠습니까?')) { setApiUsage({ text: 0, code: 0, image: 0, video: 0 }); localStorage.removeItem('devsim_usage'); } }} className="text-xs text-slate-400 hover:text-rose-400 transition-colors underline">기록 초기화</button>
+                <button onClick={() => { if(window.confirm('사용량 기록을 초기화하시겠습니까?')) { setApiUsage({ text: 0, code: 0, image: 0, video: 0, audio: 0 }); localStorage.removeItem('devsim_usage'); } }} className="text-xs text-slate-400 hover:text-rose-400 transition-colors underline">기록 초기화</button>
               </div>
             </div>
 
@@ -1806,6 +1918,7 @@ export default function DevSim() {
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-[10px] text-slate-500 flex items-center gap-1">
                       {task.specialty === 'image' ? <Palette className="w-3 h-3"/> : task.specialty === 'code' ? <Code className="w-3 h-3"/> : task.specialty === 'video' ? <Video className="w-3 h-3"/> : <FileText className="w-3 h-3"/>}
+                      {task.specialty === 'image' ? <Palette className="w-3 h-3"/> : task.specialty === 'code' ? <Code className="w-3 h-3"/> : task.specialty === 'video' ? <Video className="w-3 h-3"/> : task.specialty === 'audio' ? <Music className="w-3 h-3"/> : <FileText className="w-3 h-3"/>}
                       {task.specialty.toUpperCase()}
                     </span>
                     {task.status === 'done' && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
@@ -1975,6 +2088,7 @@ export default function DevSim() {
                         <span className="text-[10px] text-slate-400 uppercase font-bold flex items-center gap-1">
                           {mediaOutputs[npc.id].type === 'image' ? <ImageIcon className="w-3 h-3"/> : 
                            mediaOutputs[npc.id].type === 'video' ? <Video className="w-3 h-3"/> : 
+                           mediaOutputs[npc.id].type === 'audio' ? <Headphones className="w-3 h-3"/> : 
                            mediaOutputs[npc.id].type === 'code' ? <Code className="w-3 h-3"/> : <FileText className="w-3 h-3"/>}
                           {mediaOutputs[npc.id].type} RESULT
                         </span>
@@ -2076,6 +2190,11 @@ export default function DevSim() {
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-lg backdrop-blur-sm">
                                <Play className="w-8 h-8 text-white" />
                             </div>
+                          </div>
+                        )}
+                        {mediaOutputs[npc.id].type === 'audio' && (
+                          <div className="relative group p-1 w-full" onClick={(e) => e.stopPropagation()}>
+                            <audio src={mediaOutputs[npc.id].content} controls className="w-full h-8 rounded-md outline-none" />
                           </div>
                         )}
                       </div>
@@ -2347,6 +2466,7 @@ export default function DevSim() {
                       <option value="code">개발 / 코드 (Code)</option>
                       <option value="image">디자인 / 이미지 (Image)</option>
                       <option value="video">영상 제작 (Video)</option>
+                      <option value="audio">음성 / 오디오 (Audio)</option>
                     </select>
                   </div>
 
