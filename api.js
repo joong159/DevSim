@@ -1,11 +1,15 @@
 export async function callLLM(apiKey, model, systemPrompt, userPrompt, onChunk, baseUrl = '') {
   const isAnthropic = model.toLowerCase().includes('claude');
   const isGemini = model.toLowerCase().includes('gemini');
+  const isGrok = model.toLowerCase().includes('grok');
+  const isDeepseek = model.toLowerCase().includes('deepseek');
 
   let endpoint = baseUrl;
   if (!endpoint) {
     if (isAnthropic) endpoint = 'https://api.anthropic.com/v1/messages';
     else if (isGemini) endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
+    else if (isGrok) endpoint = 'https://api.x.ai/v1/chat/completions';
+    else if (isDeepseek) endpoint = 'https://api.deepseek.com/chat/completions';
     else endpoint = 'https://api.openai.com/v1/chat/completions';
   }
   

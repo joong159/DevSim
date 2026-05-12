@@ -785,7 +785,6 @@ export default function DevSim() {
 
       // [버그 수정] 사용자가 특정 API 키만 입력하고 에이전트 모델을 변경하지 않았을 경우, 입력된 키의 모델로 자동 폴백
       if (!apiKey && !npc.apiKey) {
-        if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro'; }
         if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro-latest'; }
         else if (apiKeys.anthropic) { apiKey = apiKeys.anthropic; actualModel = 'claude-3-5-sonnet-20240620'; }
         else if (apiKeys.openai) { apiKey = apiKeys.openai; actualModel = 'gpt-4o'; }
