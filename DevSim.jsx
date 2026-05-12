@@ -1074,7 +1074,6 @@ export default function DevSim() {
       if (linkedTask) {
         message = `칸반 영상 작업 렌더링 중... 🚀`;
       }
-      output = { type: 'video', content: 'https://www.w3schools.com/html/mov_bbb.mp4' };
       
       if (sourceId) setActiveConnection({ source: sourceId, target: npc.id });
       setGeneratingMessage(message);
@@ -1087,9 +1086,7 @@ export default function DevSim() {
       }));
     }
 
-    // API를 호출하지 않는 영상 작업만 기존처럼 2.5초 지연을 두어 시뮬레이션
     if (npc.specialty === 'video') {
-      await new Promise(resolve => setTimeout(resolve, 2500));
       try {
         const apiKey = (npc.apiKey || apiKeys.video || apiKeys.openai || apiKeys.gemini || apiKeys.anthropic || apiKeys.llm || '').trim();
         const baseUrl = (npc.baseUrl || '').trim();
@@ -1555,7 +1552,7 @@ export default function DevSim() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-slate-900 text-slate-200 font-sans relative">
+    <div className="flex h-screen w-full bg-slate-900 text-slate-200 font-sans relative overflow-hidden">
       {/* 폭죽 애니메이션을 위한 글로벌 스타일 */}
       <style>{`
         @keyframes explode {
@@ -1730,18 +1727,6 @@ export default function DevSim() {
                 />
                 <p className="text-xs text-slate-500 ml-1">작업 완료 시 결과물을 지정된 Discord 채널로 전송합니다.</p>
               </div>
-            <div className="space-y-2 pt-3 border-t border-slate-700/50 mt-2">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={apiKeys.autoSaveMedia || false} 
-                  onChange={(e) => setApiKeys({...apiKeys, autoSaveMedia: e.target.checked})}
-                  className="w-4 h-4 text-indigo-600 bg-slate-900 border-slate-600 rounded focus:ring-indigo-500 focus:ring-2"
-                />
-                <span className="text-sm font-semibold text-slate-300">결과물 자동 다운로드 (Auto-Save Media)</span>
-              </label>
-              <p className="text-xs text-slate-500 ml-7">이미지나 비디오가 생성 완료되면 브라우저 기본 다운로드 폴더에 즉시 저장합니다.</p>
-            </div>
 
             {/* API 사용량 모니터링 */}
             <div className="bg-slate-900/80 rounded-xl p-4 border border-slate-700 mt-6 shadow-inner">
@@ -1956,7 +1941,7 @@ export default function DevSim() {
       })()}
 
       {/* 메인 'Office' 영역 */}
-      <div className="flex-1 p-6 relative flex flex-col">
+      <div className="flex-1 min-w-0 p-6 relative flex flex-col">
         <div 
           ref={officeRef}
           className="w-full h-full bg-slate-800 rounded-3xl overflow-hidden relative shadow-2xl border border-slate-700 flex-1"
@@ -2404,7 +2389,7 @@ export default function DevSim() {
       </div>
 
       {/* 오른쪽 'Control Panel' 사이드바 */}
-      <div className="w-80 lg:w-96 bg-slate-800 border-l border-slate-700 flex flex-col shadow-2xl z-20">
+      <div className="w-80 lg:w-96 shrink-0 bg-slate-800 border-l border-slate-700 flex flex-col shadow-2xl z-20">
         <div className="p-6 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
           <div className="flex items-center gap-3">
             <Settings className="w-6 h-6 text-slate-400" />
