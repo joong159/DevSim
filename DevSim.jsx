@@ -263,14 +263,22 @@ export default function DevSim() {
 
         const restored = parsed.map(savedNpc => {
           const initNpc = initialNPCs.find(i => i.id === savedNpc.id);
+          
+          // 이전에 저장된 구버전 모델명을 최신으로 자동 마이그레이션
+          let fixedModel = savedNpc.model;
+          if (fixedModel === 'gemini-1.5-pro') {
+            fixedModel = 'gemini-1.5-pro-latest';
+          }
+          
           if (initNpc) {
             // 기존 NPC는 초기 데이터의 아이콘을 사용하고, 저장된 데이터로 덮어쓰기
-            return { ...initNpc, ...savedNpc };
+            return { ...initNpc, ...savedNpc, model: fixedModel || savedNpc.model };
           } else {
             // 새로 추가된 NPC는 규칙에 따라 아이콘 부여
             const newAgentIndex = savedNpc.id - initialNPCs.length - 1;
             return {
               ...savedNpc,
+              model: fixedModel || savedNpc.model,
               icon: availableIcons[newAgentIndex >= 0 ? newAgentIndex % availableIcons.length : 0],
             };
           }
@@ -505,6 +513,7 @@ export default function DevSim() {
 
     let globalKey = apiKeys.llm;
     let actualModel = chatNpc.model;
+    if (actualModel === 'gemini-1.5-pro') actualModel = 'gemini-1.5-pro-latest';
     const modelName = actualModel.toLowerCase();
     
     if (modelName.includes('claude')) globalKey = apiKeys.anthropic || apiKeys.llm;
@@ -771,6 +780,7 @@ export default function DevSim() {
     if (npc.specialty === 'text' || npc.specialty === 'code') {
       let globalKey = apiKeys.llm;
       let actualModel = npc.model;
+      if (actualModel === 'gemini-1.5-pro') actualModel = 'gemini-1.5-pro-latest';
       const modelName = actualModel.toLowerCase();
       
       if (modelName.includes('claude')) globalKey = apiKeys.anthropic || apiKeys.llm;
