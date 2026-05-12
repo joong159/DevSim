@@ -35,16 +35,43 @@ def get_market_ingredients(start_date='2024-01-01'):
     print("✅ 모든 데이터 수집 및 병합 완료!")
     return df_combined
 
+def classify_market_regime(df):
+    """
+    수집된 데이터를 바탕으로 현재 시장의 국면(날씨)을 판단합니다.
+    - S&P500 20일 이동평균선(MA20) 계산
+    - VIX 지수가 20 미만이고, S&P500이 20일 이평선 위에 있으면 '상승장(Risk On)'
+    - 그렇지 않으면 '관망/위험(Risk Off)'
+    """
+    print("🔍 시장 국면(날씨) 분석 중...")
+    
+    # 20일 이동평균선 계산
+    df['S&P500_MA20'] = df['S&P500'].rolling(window=20).mean()
+    
+    # 기본 국면은 'Risk Off (관망)'으로 설정
+    df['Regime'] = 'Risk Off (관망)'
+    
+    # 안전/상승장 조건: S&P500이 20일 이평선 위에 있고, VIX 공포지수가 20 미만일 때
+    condition_risk_on = (df['S&P500'] > df['S&P500_MA20']) & (df['VIX'] < 20)
+    df.loc[condition_risk_on, 'Regime'] = 'Risk On (상승장)'
+    
+    return df
+
 if __name__ == "__main__":
     # 데이터 수집 함수 실행
     market_data = get_market_ingredients()
     
+    # 2단계: 시장 국면 판단기 적용
+    market_data = classify_market_regime(market_data)
+    
     # 데이터 확인
-    print("\n[최근 5일 병합된 데이터 확인]")
-    print(market_data.tail())
+    print("\n[최근 5일 국면 판단 결과 확인]")
+    print(market_data[['VIX', 'S&P500', 'S&P500_MA20', 'Regime']].tail())
     print("-" * 50)
     
     # 현재 금리와 공포지수 출력 (마지막 행 기준)
     current_rate = float(market_data['US_10Y_Rate'].iloc[-1])
     current_vix = float(market_data['VIX'].iloc[-1])
+    current_regime = market_data['Regime'].iloc[-1]
+    
     print(f"현재 금리: {current_rate:.2f}%, 현재 공포지수: {current_vix:.2f}")
+    print(f"👉 현재 시장 국면: {current_regime}")
