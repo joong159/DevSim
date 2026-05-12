@@ -3,7 +3,6 @@ import {
   User,
   Cpu,
   Activity,
-  Info,
   Settings,
   Code,
   Terminal,
@@ -42,12 +41,10 @@ import {
   TrendingUp,
   Box,
   Monitor,
-  FileCode
   FileCode,
   Music,
   Headphones
 } from 'lucide-react';
-import { callLLM, callImageGen, callVideoGen } from './api';
 import { callLLM, callImageGen, callVideoGen, callAudioGen } from './api';
 import { sendToSlack, sendToDiscord } from './webhook';
 
@@ -172,12 +169,10 @@ export default function DevSim() {
   const [npcs, setNpcs] = useState(initialNPCs);
   const [draggingId, setDraggingId] = useState(null);
   const [logs, setLogs] = useState([]);
-  const [editingNpcId, setEditingNpcId] = useState(null);
   
   // 멀티모달 확장 기능 State
   const [showApiModal, setShowApiModal] = useState(false);
   const [apiKeys, setApiKeys] = useState({ openai: '', anthropic: '', gemini: '', grok: '', deepseek: '', llm: '', image: '', imageBaseUrl: '', video: '', audio: '', slackWebhookUrl: '', discordWebhookUrl: '' });
-  const [showSaveToast, setShowSaveToast] = useState(false);
   const [generatingId, setGeneratingId] = useState(null);
   const [mediaOutputs, setMediaOutputs] = useState({});
   const [generatingMessage, setGeneratingMessage] = useState('');
@@ -201,17 +196,21 @@ export default function DevSim() {
   const [interactionEmoji, setInteractionEmoji] = useState(null); // 대화 시 떠오르는 이모지 상태
   const [meetingLogs, setMeetingLogs] = useState([]); // 에이전트 간 회의(대화) 기록
   
-  // 챗봇 기능 State
+  // 챗봇 기능 State (로컬 스토리지 연동)
   const [chatNpcId, setChatNpcId] = useState(null);
-  const [chatHistory, setChatHistory] = useState({});
+  const [chatHistory, setChatHistory] = useState(() => {
+    const saved = localStorage.getItem('devsim_chatHistory');
+    return saved ? JSON.parse(saved) : {};
+  });
   const [chatInput, setChatInput] = useState('');
   const [isChatTyping, setIsChatTyping] = useState(false);
   const chatScrollRef = useRef(null);
 
-  // 신규 진화 기능 State
-  const [tasks, setTasks] = useState([
-    { id: 1, title: 'DevSim 랜딩 페이지 기획서 초안 작성', specialty: 'text', status: 'todo', assignee: null }
-  ]);
+  // 신규 진화 기능 State (로컬 스토리지 연동)
+  const [tasks, setTasks] = useState(() => {
+    const saved = localStorage.getItem('devsim_tasks');
+    return saved ? JSON.parse(saved) : [{ id: 1, title: 'DevSim 랜딩 페이지 기획서 초안 작성', specialty: 'text', status: 'todo', assignee: null }];
+  });
   const [commandInput, setCommandInput] = useState('');
   const [approvalReq, setApprovalReq] = useState(null); // Human-in-the-loop 상태
   
@@ -232,6 +231,15 @@ export default function DevSim() {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
   }, [chatHistory, chatNpcId]);
+
+  // 칸반 보드 및 1:1 대화 내용 자동 저장
+  useEffect(() => {
+    localStorage.setItem('devsim_tasks', JSON.stringify(tasks));
+  }, [tasks]);
+  
+  useEffect(() => {
+    localStorage.setItem('devsim_chatHistory', JSON.stringify(chatHistory));
+  }, [chatHistory]);
 
   const officeRef = useRef(null);
   const draggingIdRef = useRef(null);
@@ -306,7 +314,11 @@ export default function DevSim() {
 
   // API 키 저장 핸들러
   const handleSaveKeys = () => {
-    localStorage.setItem('devsim_keys', JSON.stringify(apiKeys));
+    const trimmedKeys = Object.fromEntries(
+      Object.entries(apiKeys).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])
+    );
+    setApiKeys(trimmedKeys);
+    localStorage.setItem('devsim_keys', JSON.stringify(trimmedKeys));
     setToastMessage('API 키가 저장되었습니다 🔐');
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
@@ -329,7 +341,12 @@ export default function DevSim() {
   const handleSaveAgent = () => {
     if (!editingAgent) return;
     
-    const updatedNpcs = npcs.map(n => n.id === editingAgent.id ? { ...n, ...editingAgent } : n);
+    const agentToSave = { 
+      ...editingAgent, 
+      apiKey: (editingAgent.apiKey || '').trim(),
+      baseUrl: (editingAgent.baseUrl || '').trim().replace(/\/$/, '')
+    };
+    const updatedNpcs = npcs.map(n => n.id === editingAgent.id ? { ...n, ...agentToSave } : n);
     setNpcs(updatedNpcs);
     
     // 아이콘 등 비직렬화(Non-serializable) 데이터 제외 후 저장
@@ -467,9 +484,10 @@ export default function DevSim() {
     mediaOutputTimeouts.current = {};
     setNpcs(initialNPCs);
     localStorage.removeItem('devsim_agents');
+    localStorage.removeItem('devsim_tasks');
+    localStorage.removeItem('devsim_chatHistory');
     setLogs([]);
     setSelectedId(null);
-    setEditingNpcId(null);
     setDraggingId(null);
     draggingIdRef.current = null;
     prevNpcsRef.current = initialNPCs;
@@ -510,7 +528,6 @@ export default function DevSim() {
     let apiKey = (chatNpc.apiKey || globalKey || '').trim();
 
     if (!apiKey && !chatNpc.apiKey) {
-      if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro'; }
       if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro-latest'; }
       else if (apiKeys.anthropic) { apiKey = apiKeys.anthropic; actualModel = 'claude-3-5-sonnet-20240620'; }
       else if (apiKeys.openai) { apiKey = apiKeys.openai; actualModel = 'gpt-4o'; }
@@ -520,6 +537,13 @@ export default function DevSim() {
 
     if (!apiKey) {
       setToastMessage(`[${actualModel}] 모델을 위한 API 키가 설정되지 않았습니다.`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      return;
+    }
+
+    if (!/^[\x00-\x7F]*$/.test(apiKey)) {
+      setToastMessage(`[${actualModel}] API 키에 유효하지 않은 문자(한글/공백 등)가 포함되어 있습니다.`);
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
       return;
@@ -676,6 +700,27 @@ export default function DevSim() {
   // 칸반 보드 자동 할당 (Autonomous Queue System)
   useEffect(() => {
     if (isPaused) return;
+
+    // [신규 기능] 방치형 무한 루프: 오토 모드인데 할 일이 없으면 PM이 스스로 일을 만듭니다.
+    if (isAutoModeRef.current && tasks.length === 0 && !approvalReq) {
+      const autoTimer = setTimeout(() => {
+        const creativeTasks = [
+          '새로운 다크모드 대시보드 UI/UX 기획안 작성',
+          '웹 앱 성능 최적화 방안 리서치 및 적용',
+          '랜딩 페이지 트랜지션 애니메이션 스크립트 기획',
+          '신규 사용자 온보딩 프로세스 시나리오 작성',
+          '시스템 오류 자동 복구(Self-Healing) 로직 구조 설계',
+          '가상 오피스 테마 추가 아이디어 발제'
+        ];
+        const randomTitle = creativeTasks[Math.floor(Math.random() * creativeTasks.length)];
+        setTasks([{ id: Date.now(), title: `[자동 생성] ${randomTitle}`, specialty: 'text', status: 'todo', assignee: null }]);
+        setToastMessage('💡 PM 에이전트가 자율적으로 새 작업을 발제했습니다!');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }, 4000);
+      return () => clearTimeout(autoTimer);
+    }
+
     const todoTasks = tasks.filter(t => t.status === 'todo');
     if (todoTasks.length === 0) return;
 
@@ -762,20 +807,19 @@ export default function DevSim() {
         setToastMessage(`[${actualModel}] 모델을 위한 API 키가 설정되지 않았습니다. 전역 API 설정 또는 에이전트 개별 API 키를 확인해주세요.`);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
-        setIsPaused(true);
         setGeneratingId(null);
-        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+                setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '에러 발생 ⚠️', x: n.prevX || n.x, y: n.prevY || n.y } : n));
+                if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'error', assignee: null } : t));
         return;
       }
       if (!/^[\x00-\x7F]*$/.test(apiKey)) {
         setToastMessage(`[${actualModel}] API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
-        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
         setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, x: n.prevX || n.x, y: n.prevY || n.y } : n));
-        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+                if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'error', assignee: null } : t));
         return;
       }
 
@@ -877,7 +921,30 @@ export default function DevSim() {
 
       try {
         const baseUrl = (npc.baseUrl || '').trim();
-        let generatedText = await callLLM(apiKey, actualModel, systemPrompt, userPrompt, handleChunk, baseUrl);
+        let generatedText = '';
+        let attempt = 1;
+        const maxAttempts = 2; // 본 시도 1회 + 복구 시도 1회
+        let lastError = null;
+
+        while (attempt <= maxAttempts) {
+          try {
+            let currentPrompt = userPrompt;
+            if (attempt > 1) {
+              addThinkingLog(npc.id, { type: 'system', content: `🚨 [Self-Healing] 에러 감지됨. 자가 복구 루프를 시작합니다. (재시도: ${attempt - 1}/${maxAttempts - 1})` });
+              currentPrompt += `\n\n[시스템 오류] 이전 시도에서 다음과 같은 오류가 발생했습니다: ${lastError.message}\n오류 원인을 분석하고 우회하여 다시 시도해주세요.`;
+              setGeneratingMessage(`자가 복구 중... 🛠️`);
+            }
+            generatedText = await callLLM(apiKey, actualModel, systemPrompt, currentPrompt, handleChunk, baseUrl);
+            break; // 성공 시 루프 탈출
+          } catch (err) {
+            lastError = err;
+            if (attempt === maxAttempts) throw err;
+            addThinkingLog(npc.id, { type: 'system', content: `❌ 통신 오류 발생: ${err.message}` });
+            attempt++;
+            await new Promise(r => setTimeout(r, 2000));
+            addThinkingLog(npc.id, { type: 'ai', content: '' }); // 재시도를 위해 빈 로그 초기화
+          }
+        }
 
         // 마크다운 백틱(```) 제거 방어 로직 (순수 코드만 남기기 위함)
         if (npc.specialty === 'code') {
@@ -891,11 +958,10 @@ export default function DevSim() {
         setToastMessage(`텍스트/코드 생성 실패: ${error.message}`);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
-        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
-        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, x: n.prevX || n.x, y: n.prevY || n.y } : n));
-        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+                setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '에러 발생 ⚠️', x: n.prevX || n.x, y: n.prevY || n.y } : n));
+                if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'error', assignee: null } : t));
         return;
       }
     } else if (npc.specialty === 'image') {
@@ -905,20 +971,19 @@ export default function DevSim() {
         setToastMessage('Image 생성 API 키가 설정되지 않았습니다. 전역 API 키 또는 에이전트 개별 API 키를 설정해주세요.');
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
-        setIsPaused(true);
         setGeneratingId(null);
-        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+                setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '에러 발생 ⚠️', x: n.prevX || n.x, y: n.prevY || n.y } : n));
+                if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'error', assignee: null } : t));
         return;
       }
       if (!/^[\x00-\x7F]*$/.test(apiKey)) {
         setToastMessage(`API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
-        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
         setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, x: n.prevX || n.x, y: n.prevY || n.y } : n));
-        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+                if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'error', assignee: null } : t));
         return;
       }
 
@@ -974,18 +1039,37 @@ export default function DevSim() {
 
       try {
         const baseUrl = (npc.baseUrl || apiKeys.imageBaseUrl || '').trim();
-        const imageUrl = await callImageGen(apiKey, userPrompt, npc.model, baseUrl);
+        let imageUrl = '';
+        let attempt = 1;
+        const maxAttempts = 2;
+        let lastError = null;
+        
+        while (attempt <= maxAttempts) {
+          try {
+            let currentPrompt = userPrompt;
+            if (attempt > 1) {
+              currentPrompt += ` (Note: Previous attempt failed due to error: ${lastError.message}. Please adjust parameters and try again.)`;
+              setGeneratingMessage(`이미지 렌더링 자가 복구 중... 🛠️`);
+            }
+            imageUrl = await callImageGen(apiKey, currentPrompt, npc.model, baseUrl);
+            break;
+          } catch (err) {
+            lastError = err;
+            if (attempt === maxAttempts) throw err;
+            attempt++;
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        }
         output = { type: 'image', content: imageUrl };
       } catch (error) {
         console.error('DALL-E 3 Error:', error);
         setToastMessage(`이미지 생성 실패: ${error.message}`);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
-        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
-        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, x: n.prevX || n.x, y: n.prevY || n.y } : n));
-        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+                setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '에러 발생 ⚠️', x: n.prevX || n.x, y: n.prevY || n.y } : n));
+                if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'error', assignee: null } : t));
         return;
       }
     } else if (npc.specialty === 'video') {
@@ -1024,22 +1108,20 @@ export default function DevSim() {
           setToastMessage('Video API 키가 설정되지 않았습니다. 설정 모달에서 Video API 키를 입력해주세요.');
           setShowToast(true);
           setTimeout(() => setShowToast(false), 3000);
-          setIsPaused(true);
           setGeneratingId(null);
           setActiveConnection(null);
-          setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, x: n.prevX || n.x, y: n.prevY || n.y } : n));
-          if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+                    setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '에러 발생 ⚠️', x: n.prevX || n.x, y: n.prevY || n.y } : n));
+                    if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'error', assignee: null } : t));
           return;
         }
         if (!/^[\x00-\x7F]*$/.test(apiKey)) {
           setToastMessage(`Video API 키에 유효하지 않은 문자(한글 등)가 포함되어 있습니다. 영문/숫자로 된 올바른 API 키를 입력해주세요.`);
           setShowToast(true);
           setTimeout(() => setShowToast(false), 3000);
-          setIsPaused(true);
           setGeneratingId(null);
           setActiveConnection(null);
           setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, x: n.prevX || n.x, y: n.prevY || n.y } : n));
-          if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+                    if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'error', assignee: null } : t));
           return;
         }
 
@@ -1076,25 +1158,40 @@ export default function DevSim() {
         }
         setGeneratingMessage(message);
 
-        const videoUrl = await callVideoGen(
-          apiKey, 
-          promptText, 
-          npc.model, 
-          baseUrl, 
-          imageContext, 
-          (progressMsg) => setGeneratingMessage(progressMsg)
-        );
+        let videoUrl = '';
+        let attempt = 1;
+        const maxAttempts = 2;
+        let lastError = null;
+
+        while (attempt <= maxAttempts) {
+          try {
+            if (attempt > 1) setGeneratingMessage(`영상 렌더링 자가 복구 중... 🛠️`);
+            videoUrl = await callVideoGen(
+              apiKey, 
+              promptText, 
+              npc.model, 
+              baseUrl, 
+              imageContext, 
+              (progressMsg) => setGeneratingMessage(progressMsg)
+            );
+            break;
+          } catch (err) {
+            lastError = err;
+            if (attempt === maxAttempts) throw err;
+            attempt++;
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        }
         output = { type: 'video', content: videoUrl };
       } catch (error) {
         console.error('Video API Error:', error);
         setToastMessage(`영상 생성 실패: ${error.message}`);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
-        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
-        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, x: n.prevX || n.x, y: n.prevY || n.y } : n));
-        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+                  setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '에러 발생 ⚠️', x: n.prevX || n.x, y: n.prevY || n.y } : n));
+                  if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'error', assignee: null } : t));
         return;
       }
     } else if (npc.specialty === 'audio') {
@@ -1104,11 +1201,10 @@ export default function DevSim() {
         setToastMessage('Audio API 키가 설정되지 않았습니다. 전역 API 키를 확인해주세요.');
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
-        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
-        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, x: n.prevX || n.x, y: n.prevY || n.y } : n));
-        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+                  setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '에러 발생 ⚠️', x: n.prevX || n.x, y: n.prevY || n.y } : n));
+                  if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'error', assignee: null } : t));
         return;
       }
 
@@ -1160,18 +1256,33 @@ export default function DevSim() {
       setGeneratingMessage(message);
 
       try {
-        const audioUrl = await callAudioGen(apiKey, userPrompt, npc.model, baseUrl);
+        let audioUrl = '';
+        let attempt = 1;
+        const maxAttempts = 2;
+        let lastError = null;
+        
+        while (attempt <= maxAttempts) {
+          try {
+            if (attempt > 1) setGeneratingMessage(`오디오 합성 자가 복구 중... 🛠️`);
+            audioUrl = await callAudioGen(apiKey, userPrompt, npc.model, baseUrl);
+            break;
+          } catch (err) {
+            lastError = err;
+            if (attempt === maxAttempts) throw err;
+            attempt++;
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        }
         output = { type: 'audio', content: audioUrl };
       } catch (error) {
         console.error('Audio API Error:', error);
         setToastMessage(`오디오 생성 실패: ${error.message}`);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
-        setIsPaused(true);
         setGeneratingId(null);
         setActiveConnection(null);
-        setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, x: n.prevX || n.x, y: n.prevY || n.y } : n));
-        if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'todo', assignee: null } : t));
+                  setNpcs(curr => curr.map(n => n.id === npc.id || n.id === sourceId ? { ...n, isBusy: false, status: '에러 발생 ⚠️', x: n.prevX || n.x, y: n.prevY || n.y } : n));
+                  if (linkedTask) setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, status: 'error', assignee: null } : t));
         return;
       }
     }
@@ -1272,7 +1383,6 @@ export default function DevSim() {
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `devsim_${type}_${new Date().getTime()}.${type === 'video' ? 'mp4' : 'png'}`;
       link.download = `devsim_${type}_${new Date().getTime()}.${type === 'video' ? 'mp4' : type === 'audio' ? 'mp3' : 'png'}`;
       document.body.appendChild(link);
       link.click();
@@ -1282,7 +1392,6 @@ export default function DevSim() {
       // CORS 등으로 fetch 실패 시 새 창으로 열기 (폴백)
       const link = document.createElement('a');
       link.href = url;
-      link.download = `devsim_${type}_${new Date().getTime()}.${type === 'video' ? 'mp4' : 'png'}`;
       link.download = `devsim_${type}_${new Date().getTime()}.${type === 'video' ? 'mp4' : type === 'audio' ? 'mp3' : 'png'}`;
       link.target = '_blank';
       document.body.appendChild(link);
@@ -1646,11 +1755,6 @@ export default function DevSim() {
               <label className="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-3">
                 <TrendingUp className="w-4 h-4 text-emerald-400" /> 로컬 API 호출 횟수 모니터링
               </label>
-              <div className="grid grid-cols-4 gap-3 text-center">
-                <div className="bg-slate-800 p-2 rounded-lg border border-slate-600"><div className="text-xs text-slate-400 mb-1">기획 (Text)</div><div className="text-lg font-bold text-white">{apiUsage.text || 0}</div></div>
-                <div className="bg-slate-800 p-2 rounded-lg border border-slate-600"><div className="text-xs text-slate-400 mb-1">개발 (Code)</div><div className="text-lg font-bold text-white">{apiUsage.code || 0}</div></div>
-                <div className="bg-slate-800 p-2 rounded-lg border border-slate-600"><div className="text-xs text-slate-400 mb-1">이미지 (Image)</div><div className="text-lg font-bold text-white">{apiUsage.image || 0}</div></div>
-                <div className="bg-slate-800 p-2 rounded-lg border border-slate-600"><div className="text-xs text-slate-400 mb-1">영상 (Video)</div><div className="text-lg font-bold text-white">{apiUsage.video || 0}</div></div>
               <div className="grid grid-cols-5 gap-2 text-center">
                 <div className="bg-slate-800 p-1.5 rounded-lg border border-slate-600"><div className="text-[10px] text-slate-400 mb-1">기획</div><div className="text-base font-bold text-white">{apiUsage.text || 0}</div></div>
                 <div className="bg-slate-800 p-1.5 rounded-lg border border-slate-600"><div className="text-[10px] text-slate-400 mb-1">개발</div><div className="text-base font-bold text-white">{apiUsage.code || 0}</div></div>
@@ -1660,7 +1764,6 @@ export default function DevSim() {
               </div>
               <div className="flex justify-between items-center mt-3">
                 <p className="text-[10px] text-slate-500">※ 이 수치는 현재 브라우저에서 실행된 성공적인 호출 횟수입니다. 정확한 비용은 각 API 대시보드에서 확인하세요.</p>
-                <button onClick={() => { if(window.confirm('사용량 기록을 초기화하시겠습니까?')) { setApiUsage({ text: 0, code: 0, image: 0, video: 0 }); localStorage.removeItem('devsim_usage'); } }} className="text-xs text-slate-400 hover:text-rose-400 transition-colors underline">기록 초기화</button>
                 <button onClick={() => { if(window.confirm('사용량 기록을 초기화하시겠습니까?')) { setApiUsage({ text: 0, code: 0, image: 0, video: 0, audio: 0 }); localStorage.removeItem('devsim_usage'); } }} className="text-xs text-slate-400 hover:text-rose-400 transition-colors underline">기록 초기화</button>
               </div>
             </div>
@@ -1910,14 +2013,14 @@ export default function DevSim() {
                     <span className="text-xs font-bold text-slate-300 break-words flex-1 pr-4 leading-tight">{task.title}</span>
                     <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
                       task.status === 'todo' ? 'bg-slate-700 text-slate-400' :
-                      task.status === 'in-progress' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-emerald-500/20 text-emerald-400'
+                      task.status === 'in-progress' ? 'bg-indigo-500/20 text-indigo-400' :
+                      task.status === 'error' ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
                     }`}>
                       {task.status === 'in-progress' ? `WIP: ${task.assignee}` : task.status}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                      {task.specialty === 'image' ? <Palette className="w-3 h-3"/> : task.specialty === 'code' ? <Code className="w-3 h-3"/> : task.specialty === 'video' ? <Video className="w-3 h-3"/> : <FileText className="w-3 h-3"/>}
                       {task.specialty === 'image' ? <Palette className="w-3 h-3"/> : task.specialty === 'code' ? <Code className="w-3 h-3"/> : task.specialty === 'video' ? <Video className="w-3 h-3"/> : task.specialty === 'audio' ? <Music className="w-3 h-3"/> : <FileText className="w-3 h-3"/>}
                       {task.specialty.toUpperCase()}
                     </span>

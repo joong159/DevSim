@@ -1,0 +1,181 @@
+import React, { useState } from 'react';
+import TaskDetailModal, { Task } from '../components/task/TaskDetailModal';
+import Navbar from './Navbar';
+import Sidebar from './Sidebar';
+
+export default function Home() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  // 과제 리스트 데이터를 상태로 관리
+  const [tasks, setTasks] = useState<Task[]>([
+    {
+      title: 'A스타트업 F&B SNS 콘텐츠 기획',
+      category: '마케팅',
+      deadline: '마감 2일 전',
+      description: '식당 및 카페 서빙 알바 경험을 살려 20대 타겟의 인스타그램 릴스 기획안을 작성해주세요.\n\n[주요 업무]\n- 20대 타겟 인스타그램 릴스 콘텐츠 아이디어 제안\n- 간단한 스토리보드 기획',
+      requirements: ['인스타그램 릴스/틱톡 헤비 유저', 'F&B 관련 알바 3개월 이상 경험자'],
+      reward: '디지털 배지 [트렌드 캐처] + 경험치 50xp'
+    },
+    {
+      title: '커머스 플랫폼 고객 리뷰 감정 분석',
+      category: '데이터',
+      deadline: '마감 5일 전',
+      description: '단순 엑셀 작업 경험을 증명할 수 있는 리뷰 데이터 라벨링 및 긍정/부정 분류 작업입니다.\n\n[주요 업무]\n- 500건의 고객 리뷰 리딩\n- 긍정/부정/중립 감정 태그 라벨링',
+      requirements: ['엑셀 기본 기능 활용 가능자', '꼼꼼하고 책임감 있는 성격'],
+      reward: '디지털 배지 [꼼꼼한 데이터거] + 경험치 40xp'
+    }
+  ]);
+
+  const openModal = (task: Task) => {
+    setSelectedTask(task);
+    setIsModalOpen(true);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f8f9fa]">
+      <Navbar />
+      <div className="flex max-w-7xl mx-auto pt-14 px-4 md:px-8">
+        <Sidebar />
+        <main className="flex-1 py-8 overflow-hidden w-full">
+          {/* 상단 헤더 영역 */}
+          <header className="mb-8">
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">🔥 실무 과제 퀘스트</h1>
+            <p className="text-gray-500 mt-1 font-medium">단순 알바를 넘어, 진짜 실무를 경험하는 시간</p>
+          </header>
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            
+            {/* 왼쪽: 실무 과제 리스트 (비중 2/3) */}
+            <section className="xl:col-span-2 space-y-4">
+              <div className="flex justify-between items-end mb-4">
+                <h2 className="text-lg font-bold text-gray-800">실시간 모집 중인 과제</h2>
+                <button className="text-sm text-red-500 font-semibold hover:underline">더보기</button>
+              </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 더미 데이터 배열을 .map()으로 동적 렌더링 */}
+            {tasks.map((task, index) => (
+              <div key={index} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
+                <div className="flex justify-between items-start mb-3">
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${task.category === '마케팅' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
+                    {task.category}
+                  </span>
+                  <span className={`text-sm ${task.deadline.includes('2일') ? 'text-red-500 font-semibold' : 'text-gray-400 font-medium'}`}>
+                    {task.deadline}
+                  </span>
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2 leading-tight">{task.title}</h3>
+                <p className="text-sm text-gray-500 mb-5 line-clamp-2">{task.description.split('\n')[0]}</p>
+                <button 
+                  onClick={() => openModal(task)}
+                  className="w-full bg-gray-50 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-red-50 hover:text-red-500 transition-colors"
+                >
+                  과제 상세 보기
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 오른쪽: 내 알바 역량 대시보드 (비중 1/3) */}
+        <section className="space-y-4">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">📊 내 역량 대시보드</h2>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            
+            {/* 프로필 요약 */}
+            <div className="flex items-center space-x-4 mb-6">
+              <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center text-2xl">🎓</div>
+              <div>
+                <p className="font-bold text-gray-900 text-lg">김스킬</p>
+                <p className="text-sm text-gray-500 font-medium">Lv.2 루키 크루</p>
+              </div>
+            </div>
+            
+            {/* 획득한 배지 */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-bold text-gray-700">획득한 디지털 배지</h4>
+              <div className="flex space-x-3">
+                <div className="w-12 h-12 bg-yellow-50 rounded-xl flex items-center justify-center text-2xl shadow-sm" title="고객 응대 마스터">🗣️</div>
+                <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-2xl shadow-sm" title="꼼꼼한 데이터거">📊</div>
+                <div className="w-12 h-12 bg-gray-50 border border-dashed border-gray-300 rounded-xl flex items-center justify-center text-xl opacity-50" title="잠금 해제 필요">🔒</div>
+              </div>
+            </div>
+
+            {/* 레벨업 프로그레스바 */}
+            <div className="mt-8 pt-6 border-t border-gray-100">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-sm font-bold text-gray-700">다음 레벨까지</h4>
+                <span className="text-xs font-bold text-red-500">60%</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2.5">
+                <div className="bg-red-400 h-2.5 rounded-full transition-all duration-500" style={{ width: '60%' }}></div>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">스타트업 과제 2회 더 완료 시 레벨업!</p>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+
+      {/* 과제 상세 모달 */}
+      <TaskDetailModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        task={selectedTask} 
+      />
+        </main>
+      </div>
+    </div>
+  );
+}
+import type { Metadata } from 'next';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Skillit (스킬릿) - 알바가 커리어가 되는 시간',
+  description: '단순 알바 이력을 데이터화하고, 스타트업 실무 과제를 수행하며 디지털 배지를 획득하세요. 20대 대학생과 취준생을 위한 실무 경험 증명 플랫폼.',
+  keywords: ['대학생', '취준생', '알바', '실무경험', '스타트업과제', '디지털배지', '에브리타임', '이력서', '포트폴리오', '스킬릿', 'Skillit'],
+  openGraph: {
+    title: 'Skillit (스킬릿) | 대학생 실무 배지 플랫폼',
+    description: '단순 알바를 넘어 진짜 실무 경험으로. 디지털 배지로 당신의 역량을 증명하세요.',
+    url: 'https://skillit.kr',
+    siteName: 'Skillit',
+    images: [
+      {
+        url: 'https://skillit.kr/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Skillit 서비스 메인 이미지',
+      },
+    ],
+    locale: 'ko_KR',
+    type: 'website',
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="ko">
+      <body className="antialiased">{children}</body>
+    </html>
+  );
+}
+skillit-web/
+├── app/
+│   ├── layout.tsx         # 전역 레이아웃 및 SEO 메타데이터 설정 (헤더/푸터 등)
+│   ├── page.tsx           # 메인 랜딩 페이지 (에브리타임 스타일 UI)
+│   ├── globals.css        # Tailwind CSS 진입점
+│   └── (routes)/          # 기타 페이지 라우트 (예: /tasks, /profile)
+├── components/
+│   ├── ui/                # 재사용 가능한 공통 컴포넌트 (버튼, 뱃지 등)
+│   ├── dashboard/         # 알바 역량 대시보드 관련 컴포넌트
+│   └── task/              # 실무 과제 리스트 관련 컴포넌트
+├── lib/                   # 유틸리티 함수 (날짜 계산, 포맷팅 등)
+├── store/                 # 전역 상태 관리 (Zustand 등)
+└── types/                 # TypeScript 타입/인터페이스 정의

@@ -49,8 +49,15 @@ export async function callLLM(apiKey, model, systemPrompt, userPrompt, onChunk, 
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `LLM API 요청 실패: ${response.status}`);
+    const errText = await response.text();
+    let errMsg = `LLM API 요청 실패: ${response.status}`;
+    try {
+      const err = JSON.parse(errText);
+      errMsg = err.error?.message || err.message || errMsg;
+    } catch (e) {
+      errMsg += ` - ${errText.substring(0, 100)}`;
+    }
+    throw new Error(errMsg);
   }
 
   const reader = response.body.getReader();
@@ -118,8 +125,15 @@ export async function callImageGen(apiKey, prompt, model = 'dall-e-3', baseUrl =
     });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.message || err.error?.message || `이미지 생성 실패: ${response.status}`);
+      const errText = await response.text();
+      let errMsg = `이미지 생성 실패: ${response.status}`;
+      try {
+        const err = JSON.parse(errText);
+        errMsg = err.message || err.error?.message || errMsg;
+      } catch (e) {
+        errMsg += ` - ${errText.substring(0, 100)}`;
+      }
+      throw new Error(errMsg);
     }
 
     // Stability AI는 'Accept: image/*' 요청 시 바이너리(Blob)를 직접 반환합니다.
@@ -144,8 +158,15 @@ export async function callImageGen(apiKey, prompt, model = 'dall-e-3', baseUrl =
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `이미지 생성 실패: ${response.status}`);
+    const errText = await response.text();
+    let errMsg = `이미지 생성 실패: ${response.status}`;
+    try {
+      const err = JSON.parse(errText);
+      errMsg = err.error?.message || err.message || errMsg;
+    } catch (e) {
+      errMsg += ` - ${errText.substring(0, 100)}`;
+    }
+    throw new Error(errMsg);
   }
 
   const data = await response.json();
@@ -178,8 +199,15 @@ export async function callVideoGen(apiKey, prompt, model = 'luma-dream-machine',
     });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error?.message || err.message || `Runway 영상 생성 요청 실패: ${response.status}`);
+      const errText = await response.text();
+      let errMsg = `Runway 영상 생성 요청 실패: ${response.status}`;
+      try {
+        const err = JSON.parse(errText);
+        errMsg = err.error?.message || err.message || errMsg;
+      } catch (e) {
+        errMsg += ` - ${errText.substring(0, 100)}`;
+      }
+      throw new Error(errMsg);
     }
     
     const data = await response.json();
@@ -205,8 +233,15 @@ export async function callVideoGen(apiKey, prompt, model = 'luma-dream-machine',
 
   const createRes = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify(requestBody) });
   if (!createRes.ok) {
-    const err = await createRes.json().catch(() => ({}));
-    throw new Error(err.message || `Luma API 요청 실패: ${createRes.status}`);
+    const errText = await createRes.text();
+    let errMsg = `Luma API 요청 실패: ${createRes.status}`;
+    try {
+      const err = JSON.parse(errText);
+      errMsg = err.message || err.error?.message || errMsg;
+    } catch (e) {
+      errMsg += ` - ${errText.substring(0, 100)}`;
+    }
+    throw new Error(errMsg);
   }
 
   const createData = await createRes.json();
@@ -243,8 +278,15 @@ export async function callAudioGen(apiKey, prompt, model = 'tts-1', baseUrl = ''
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || err.message || `오디오 생성 실패: ${response.status}`);
+    const errText = await response.text();
+    let errMsg = `오디오 생성 실패: ${response.status}`;
+    try {
+      const err = JSON.parse(errText);
+      errMsg = err.error?.message || err.message || errMsg;
+    } catch (e) {
+      errMsg += ` - ${errText.substring(0, 100)}`;
+    }
+    throw new Error(errMsg);
   }
 
   const blob = await response.blob();
