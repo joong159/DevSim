@@ -2389,13 +2389,13 @@ export default function DevSim() {
       </div>
 
       {/* 오른쪽 'Control Panel' 사이드바 */}
-      <div className="w-full lg:w-80 xl:w-96 shrink-0 bg-slate-800 border-t lg:border-t-0 lg:border-l border-slate-700 flex flex-col shadow-2xl z-20 h-[45vh] lg:h-full">
-        <div className="p-4 lg:p-6 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
-          <div className="flex items-center gap-3">
-            <Settings className="w-6 h-6 text-slate-400" />
-            <h2 className="text-xl font-bold text-white tracking-wide">Control Panel</h2>
+      <div className="w-full lg:w-80 xl:w-96 shrink-0 bg-slate-800 border-t lg:border-t-0 lg:border-l border-slate-700 flex flex-col shadow-2xl z-20 h-[45vh] lg:h-full overflow-hidden">
+        <div className="p-4 border-b border-slate-700 flex flex-col gap-3 bg-slate-800/50 shrink-0">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-slate-400 shrink-0" />
+            <h2 className="text-lg font-bold text-white tracking-wide truncate">Control Panel</h2>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-1.5">
             <button
               onClick={() => {
                 setIsAutoMode(!isAutoMode);
@@ -2472,9 +2472,9 @@ export default function DevSim() {
 
               {/* 상태 정보 영역 */}
               <div className="bg-slate-900 p-5 rounded-2xl border border-slate-700 space-y-4 shadow-inner">
-              <h4 className="flex items-center justify-between text-sm font-semibold text-slate-400 uppercase tracking-wider">
-                <span className="flex items-center gap-2"><Activity className="w-4 h-4 text-emerald-400" /> Current Status</span>
-                <div className="flex gap-2">
+              <h4 className="flex flex-col xl:flex-row items-start xl:items-center justify-between text-sm font-semibold text-slate-400 uppercase tracking-wider gap-2">
+                <span className="flex items-center gap-2 shrink-0"><Activity className="w-4 h-4 text-emerald-400" /> Current Status</span>
+                <div className="flex flex-wrap gap-1.5 w-full xl:w-auto justify-end">
                   <button 
                     onClick={() => setChatNpcId(selectedNPC.id)}
                     className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-white font-medium text-xs px-3 py-1.5 rounded-lg transition-colors shadow-md"
@@ -2645,18 +2645,18 @@ export default function DevSim() {
         {/* 하단 활동 로그 내역 (Activity Logs) */}
         <div className="bg-slate-900/50 flex flex-col shrink-0" style={{ height: `${logHeight}px` }}>
           {/* 탭 헤더 */}
-          <div className="px-5 pt-3 border-b border-slate-700 bg-slate-800/80 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button onClick={() => setActiveLogTab('logs')} className={`flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-t-lg border-b-2 transition-colors ${activeLogTab === 'logs' ? 'text-slate-200 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>
-                <History className="w-4 h-4" />
-                Activity Logs
+          <div className="px-3 pt-2 border-b border-slate-700 bg-slate-800/80 flex items-center justify-between overflow-x-auto no-scrollbar gap-2">
+            <div className="flex items-center gap-1 shrink-0">
+              <button onClick={() => setActiveLogTab('logs')} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-bold rounded-t-lg border-b-2 transition-colors whitespace-nowrap ${activeLogTab === 'logs' ? 'text-slate-200 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>
+                <History className="w-4 h-4 shrink-0" />
+                Logs
               </button>
-              <button onClick={() => setActiveLogTab('thinking')} className={`flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-t-lg border-b-2 transition-colors ${activeLogTab === 'thinking' ? 'text-slate-200 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>
-                <BrainCircuit className="w-4 h-4" />
-                Thinking Process
+              <button onClick={() => setActiveLogTab('thinking')} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-bold rounded-t-lg border-b-2 transition-colors whitespace-nowrap ${activeLogTab === 'thinking' ? 'text-slate-200 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>
+                <BrainCircuit className="w-4 h-4 shrink-0" />
+                Thinking
               </button>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {activeLogTab === 'logs' && (
                 <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700 shadow-inner">
                   {logs.length}
