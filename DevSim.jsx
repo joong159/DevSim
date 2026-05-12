@@ -1552,7 +1552,7 @@ export default function DevSim() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-slate-900 text-slate-200 font-sans relative overflow-hidden">
+    <div className="fixed inset-0 flex flex-col lg:flex-row w-full bg-slate-900 text-slate-200 font-sans overflow-hidden">
       {/* 폭죽 애니메이션을 위한 글로벌 스타일 */}
       <style>{`
         @keyframes explode {
@@ -1578,26 +1578,26 @@ export default function DevSim() {
       {/* API 키 설정 모달 */}
       {showApiModal && (
         <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800/95 w-full max-w-lg rounded-3xl shadow-[0_0_50px_-12px_rgba(99,102,241,0.5)] border border-slate-600 p-8 relative overflow-hidden">
+          <div className="bg-slate-800/95 w-full max-w-lg rounded-3xl shadow-[0_0_50px_-12px_rgba(99,102,241,0.5)] border border-slate-600 p-6 lg:p-8 relative overflow-hidden flex flex-col max-h-[90vh]">
             {/* 상단 그라데이션 장식 */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
             {/* 배경 희미한 빛 효과 */}
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
             
-            <div className="flex justify-between items-start mb-8 relative z-10">
+            <div className="flex justify-between items-start mb-6 relative z-10 shrink-0">
               <div>
-                <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-3 mb-2">
-                  <Key className="w-7 h-7 text-indigo-400" /> 
+                <h3 className="text-xl lg:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-3 mb-2">
+                  <Key className="w-6 h-6 lg:w-7 lg:h-7 text-indigo-400" /> 
                   전역 API 키 설정
                 </h3>
-                <p className="text-sm text-slate-400">에이전트들이 사용할 기본 AI 모델 API 키를 등록하세요.<br/>개별 설정이 없는 에이전트는 이 키를 사용합니다.</p>
+                <p className="text-xs lg:text-sm text-slate-400">에이전트들이 사용할 기본 AI 모델 API 키를 등록하세요.<br/>개별 설정이 없는 에이전트는 이 키를 사용합니다.</p>
               </div>
               <button onClick={() => setShowApiModal(false)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-full transition-colors bg-slate-800 border border-slate-700 shadow-sm">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="space-y-6 relative z-10">
+            <div className="space-y-6 relative z-10 overflow-y-auto flex-1 pr-2">
               <div className="space-y-3 bg-slate-900/40 p-4 rounded-xl border border-slate-700">
                 <label className="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-1"><Bot className="w-4 h-4 text-emerald-400" /> LLM (텍스트/코드) API 키</label>
                 
@@ -1747,7 +1747,7 @@ export default function DevSim() {
             </div>
 
             </div>
-            <div className="mt-8 flex justify-end gap-3 relative z-10">
+            <div className="mt-6 pt-4 border-t border-slate-700/50 flex justify-end gap-3 relative z-10 shrink-0">
               <button onClick={() => setShowApiModal(false)} className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition-colors border border-slate-600">취소</button>
               <button onClick={() => { handleSaveKeys(); setShowApiModal(false); }} className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/25 transform hover:-translate-y-0.5">
                 <Save className="w-4 h-4" /> 저장
@@ -1941,7 +1941,7 @@ export default function DevSim() {
       })()}
 
       {/* 메인 'Office' 영역 */}
-      <div className="flex-1 min-w-0 p-6 relative flex flex-col">
+      <div className="flex-1 min-w-0 min-h-0 p-3 md:p-6 relative flex flex-col">
         <div 
           ref={officeRef}
           className="w-full h-full bg-slate-800 rounded-3xl overflow-hidden relative shadow-2xl border border-slate-700 flex-1"
@@ -1978,7 +1978,7 @@ export default function DevSim() {
           </div>
 
           {/* 칸반 보드 (Kanban Board) UI */}
-          <div className="absolute top-6 right-6 w-72 bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-700 shadow-2xl z-20 flex flex-col max-h-[60%] overflow-hidden pointer-events-none group hover:pointer-events-auto transition-all opacity-80 hover:opacity-100">
+          <div className="absolute top-3 right-3 md:top-6 md:right-6 w-60 md:w-72 bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-700 shadow-2xl z-20 flex flex-col max-h-[50%] md:max-h-[60%] overflow-hidden pointer-events-none group hover:pointer-events-auto transition-all opacity-80 hover:opacity-100">
             <div className="p-3 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
               <span className="font-bold text-slate-200 flex items-center gap-2">
                 <LayoutList className="w-4 h-4 text-indigo-400" /> Task Board
@@ -2083,7 +2083,7 @@ export default function DevSim() {
           )}
 
           {/* 상단 오피스 타이틀 */}
-          <div className="absolute top-6 left-6 z-20 flex items-center gap-4">
+          <div className="absolute top-3 left-3 md:top-6 md:left-6 z-20 flex items-center gap-3 md:gap-4 scale-90 md:scale-100 origin-top-left">
             <div className="flex items-center gap-2 text-xl font-bold text-slate-300 bg-slate-900/80 px-4 py-2 rounded-full backdrop-blur-sm border border-slate-700 shadow-lg">
               <Cpu className="w-6 h-6 text-indigo-400" />
               DevSim Office
@@ -2366,7 +2366,7 @@ export default function DevSim() {
           })}
 
           {/* 하단 글로벌 커맨드 입력 바 */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl z-20">
+          <div className="absolute bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 w-[90%] md:w-full max-w-2xl z-20">
             <form onSubmit={handleCommandSubmit} className="relative flex items-center shadow-2xl group">
               <MessageCircle className="absolute left-5 w-5 h-5 text-slate-400 group-focus-within:text-indigo-400 transition-colors" />
               <input
@@ -2389,8 +2389,8 @@ export default function DevSim() {
       </div>
 
       {/* 오른쪽 'Control Panel' 사이드바 */}
-      <div className="w-80 lg:w-96 shrink-0 bg-slate-800 border-l border-slate-700 flex flex-col shadow-2xl z-20">
-        <div className="p-6 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
+      <div className="w-full lg:w-80 xl:w-96 shrink-0 bg-slate-800 border-t lg:border-t-0 lg:border-l border-slate-700 flex flex-col shadow-2xl z-20 h-[45vh] lg:h-full">
+        <div className="p-4 lg:p-6 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
           <div className="flex items-center gap-3">
             <Settings className="w-6 h-6 text-slate-400" />
             <h2 className="text-xl font-bold text-white tracking-wide">Control Panel</h2>
@@ -2456,7 +2456,7 @@ export default function DevSim() {
           </div>
         </div>
 
-        <div className="flex-1 p-6 overflow-y-auto">
+        <div className="flex-1 min-h-0 p-4 lg:p-6 overflow-y-auto">
           {selectedNPC ? (
             <div className="space-y-6">
               {/* 프로필 카드 영역 */}
