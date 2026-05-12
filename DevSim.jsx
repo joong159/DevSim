@@ -55,6 +55,7 @@ const modelOptions = {
     { value: 'gpt-4-turbo', label: 'OpenAI (GPT-4 Turbo)' },
     { value: 'claude-3-5-sonnet-20240620', label: 'Anthropic (Claude 3.5 Sonnet)' },
     { value: 'claude-3-opus-20240229', label: 'Anthropic (Claude 3 Opus)' },
+    { value: 'gemini-1.5-flash', label: 'Google (Gemini 1.5 Flash)' },
     { value: 'gemini-1.5-pro-latest', label: 'Google (Gemini 1.5 Pro)' },
     { value: 'grok-beta', label: 'xAI (Grok Beta)' },
     { value: 'deepseek-chat', label: 'DeepSeek Chat' }
@@ -62,6 +63,7 @@ const modelOptions = {
   code: [
     { value: 'gpt-4o', label: 'OpenAI (GPT-4o)' },
     { value: 'claude-3-5-sonnet-20240620', label: 'Anthropic (Claude 3.5 Sonnet)' },
+    { value: 'gemini-1.5-flash', label: 'Google (Gemini 1.5 Flash)' },
     { value: 'gemini-1.5-pro-latest', label: 'Google (Gemini 1.5 Pro)' },
     { value: 'deepseek-chat', label: 'DeepSeek Coder (Chat)' }
   ],
@@ -266,8 +268,8 @@ export default function DevSim() {
           
           // 이전에 저장된 구버전 모델명을 최신으로 자동 마이그레이션
           let fixedModel = savedNpc.model;
-          if (fixedModel === 'gemini-1.5-pro') {
-            fixedModel = 'gemini-1.5-pro-latest';
+          if (fixedModel === 'gemini-1.5-pro' || fixedModel === 'gemini-1.5-pro-latest') {
+            fixedModel = 'gemini-1.5-flash';
           }
           
           if (initNpc) {
@@ -513,7 +515,7 @@ export default function DevSim() {
 
     let globalKey = apiKeys.llm;
     let actualModel = chatNpc.model;
-    if (actualModel === 'gemini-1.5-pro') actualModel = 'gemini-1.5-pro-latest';
+    if (actualModel.includes('gemini-1.5-pro')) actualModel = 'gemini-1.5-flash';
     const modelName = actualModel.toLowerCase();
     
     if (modelName.includes('claude')) globalKey = apiKeys.anthropic || apiKeys.llm;
@@ -525,7 +527,7 @@ export default function DevSim() {
     let apiKey = (chatNpc.apiKey || globalKey || '').trim();
 
     if (!apiKey && !chatNpc.apiKey) {
-      if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro-latest'; }
+      if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-flash'; }
       else if (apiKeys.anthropic) { apiKey = apiKeys.anthropic; actualModel = 'claude-3-5-sonnet-20240620'; }
       else if (apiKeys.openai) { apiKey = apiKeys.openai; actualModel = 'gpt-4o'; }
       else if (apiKeys.grok) { apiKey = apiKeys.grok; actualModel = 'grok-beta'; }
@@ -780,7 +782,7 @@ export default function DevSim() {
     if (npc.specialty === 'text' || npc.specialty === 'code') {
       let globalKey = apiKeys.llm;
       let actualModel = npc.model;
-      if (actualModel === 'gemini-1.5-pro') actualModel = 'gemini-1.5-pro-latest';
+      if (actualModel.includes('gemini-1.5-pro')) actualModel = 'gemini-1.5-flash';
       const modelName = actualModel.toLowerCase();
       
       if (modelName.includes('claude')) globalKey = apiKeys.anthropic || apiKeys.llm;
@@ -793,7 +795,7 @@ export default function DevSim() {
 
       // [버그 수정] 사용자가 특정 API 키만 입력하고 에이전트 모델을 변경하지 않았을 경우, 입력된 키의 모델로 자동 폴백
       if (!apiKey && !npc.apiKey) {
-        if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-pro-latest'; }
+        if (apiKeys.gemini) { apiKey = apiKeys.gemini; actualModel = 'gemini-1.5-flash'; }
         else if (apiKeys.anthropic) { apiKey = apiKeys.anthropic; actualModel = 'claude-3-5-sonnet-20240620'; }
         else if (apiKeys.openai) { apiKey = apiKeys.openai; actualModel = 'gpt-4o'; }
         else if (apiKeys.grok) { apiKey = apiKeys.grok; actualModel = 'grok-beta'; }
