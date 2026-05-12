@@ -156,14 +156,6 @@ const twColorToHex = {
   'bg-pink-500': '#ec4899'
 };
 
-// 각 NPC별 업무 코드 스니펫 (더블클릭 시 표시)
-const codeSnippets = {
-  1: `import React from 'react';\nimport { Button } from '@/components/ui';\n\nexport default function LandingPage() {\n  return (\n    <div className="min-h-screen bg-slate-900 flex items-center justify-center">\n      <h1 className="text-5xl font-bold text-white mb-6">Welcome to DevSim!</h1>\n      <Button variant="primary" size="lg">Get Started</Button>\n    </div>\n  );\n}`,
-  2: `const express = require('express');\nconst router = express.Router();\nconst { verifyToken } = require('../middlewares/auth');\n\nrouter.post('/login', async (req, res) => {\n  try {\n    const { email, password } = req.body;\n    // FIXME: 인증 토큰 검증 로직 버그 수정 중\n    const token = await authenticateUser(email, password);\n    res.status(200).json({ token });\n  } catch (error) {\n    res.status(401).json({ error: 'Unauthorized' });\n  }\n});`,
-  3: `name: Staging Deployment\n\non:\n  push:\n    branches: [ "main" ]\n\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v3\n      - name: Setup Node.js\n        uses: actions/setup-node@v3\n        with:\n          node-version: '18'\n      - name: Install dependencies\n        run: npm ci\n      - name: Build & Deploy\n        run: |\n          npm run build\n          ./deploy-staging.sh`,
-  4: `.glass-panel {\n  background: rgba(255, 255, 255, 0.05);\n  backdrop-filter: blur(10px);\n  -webkit-backdrop-filter: blur(10px);\n  border: 1px solid rgba(255, 255, 255, 0.1);\n  border-radius: 16px;\n  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);\n}\n\n.btn-primary:hover {\n  transform: translateY(-2px);\n  transition: all 0.2s ease-in-out;\n}`
-};
-
 export default function DevSim() {
   const [selectedId, setSelectedId] = useState(null);
   const [npcs, setNpcs] = useState(initialNPCs);
@@ -244,7 +236,6 @@ export default function DevSim() {
   const officeRef = useRef(null);
   const draggingIdRef = useRef(null);
   const prevNpcsRef = useRef(initialNPCs);
-  const shoutTimeoutRef = useRef(null);
   const mediaOutputTimeouts = useRef({}); // 결과물 자동 닫기 타임아웃 관리를 위한 Ref
 
   // 로컬 스토리지에서 API 키 및 커스텀 에이전트 데이터 불러오기
@@ -479,7 +470,6 @@ export default function DevSim() {
   }, [isPaused]);
 
   const handleReset = () => {
-    if (shoutTimeoutRef.current) clearTimeout(shoutTimeoutRef.current);
     Object.values(mediaOutputTimeouts.current).forEach(clearTimeout);
     mediaOutputTimeouts.current = {};
     setNpcs(initialNPCs);
