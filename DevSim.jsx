@@ -55,7 +55,6 @@ const modelOptions = {
     { value: 'gpt-4-turbo', label: 'OpenAI (GPT-4 Turbo)' },
     { value: 'claude-3-5-sonnet-20240620', label: 'Anthropic (Claude 3.5 Sonnet)' },
     { value: 'claude-3-opus-20240229', label: 'Anthropic (Claude 3 Opus)' },
-    { value: 'gemini-1.5-pro', label: 'Google (Gemini 1.5 Pro)' },
     { value: 'gemini-1.5-pro-latest', label: 'Google (Gemini 1.5 Pro)' },
     { value: 'grok-beta', label: 'xAI (Grok Beta)' },
     { value: 'deepseek-chat', label: 'DeepSeek Chat' }
@@ -63,7 +62,6 @@ const modelOptions = {
   code: [
     { value: 'gpt-4o', label: 'OpenAI (GPT-4o)' },
     { value: 'claude-3-5-sonnet-20240620', label: 'Anthropic (Claude 3.5 Sonnet)' },
-    { value: 'gemini-1.5-pro', label: 'Google (Gemini 1.5 Pro)' },
     { value: 'gemini-1.5-pro-latest', label: 'Google (Gemini 1.5 Pro)' },
     { value: 'deepseek-chat', label: 'DeepSeek Coder (Chat)' }
   ],
