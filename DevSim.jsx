@@ -65,7 +65,7 @@ const modelOptions = {
     { value: 'claude-3-5-sonnet-20240620', label: 'Anthropic (Claude 3.5 Sonnet)' },
     { value: 'gemini-1.5-pro', label: 'Google (Gemini 1.5 Pro)' },
     { value: 'gemini-1.5-pro-latest', label: 'Google (Gemini 1.5 Pro)' },
-    { value: 'deepseek-coder', label: 'DeepSeek Coder' }
+    { value: 'deepseek-chat', label: 'DeepSeek Coder (Chat)' }
   ],
   image: [
     { value: 'dall-e-3', label: 'OpenAI (DALL-E 3)' },
@@ -1265,7 +1265,11 @@ export default function DevSim() {
         output = { type: 'audio', content: audioUrl };
       } catch (error) {
         console.error('Audio API Error:', error);
-        setToastMessage(`오디오 생성 실패: ${error.message}`);
+        let errMsg = error.message;
+        if (errMsg === 'Failed to fetch') {
+          errMsg = '네트워크 통신 실패 (CORS 문제이거나 Base URL 오류일 수 있습니다)';
+        }
+        setToastMessage(`오디오 생성 실패: ${errMsg}`);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
         setGeneratingId(null);

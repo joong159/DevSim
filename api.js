@@ -1,11 +1,21 @@
 export async function callLLM(apiKey, model, systemPrompt, userPrompt, onChunk, baseUrl = '') {
+  // 딥시크 모델 통합 대응 (예전 coder 모델명 호출 시 chat 모델로 자동 변환)
+  if (model === 'deepseek-coder') model = 'deepseek-chat';
+
   const isAnthropic = model.toLowerCase().includes('claude');
   const isGemini = model.toLowerCase().includes('gemini');
   const isGrok = model.toLowerCase().includes('grok');
   const isDeepseek = model.toLowerCase().includes('deepseek');
 
   let endpoint = baseUrl;
-  if (!endpoint) {
+  if (endpoint) {
+    // 사용자가 Base URL 도메인만 입력하고 세부 엔드포인트를 생략한 경우 자동 추가
+    if (!endpoint.includes('/chat/completions') && !endpoint.includes('/messages') && !endpoint.includes(':streamGenerateContent')) {
+      if (isAnthropic) endpoint = endpoint.replace(/\/$/, '') + '/v1/messages';
+      else if (isGemini) endpoint = endpoint.replace(/\/$/, '') + `/v1beta/models/${model}:streamGenerateContent?alt=sse`;
+      else endpoint = endpoint.replace(/\/$/, '') + '/chat/completions';
+    }
+  } else {
     if (isAnthropic) endpoint = 'https://api.anthropic.com/v1/messages';
     else if (isGemini) endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
     else if (isGrok) endpoint = 'https://api.x.ai/v1/chat/completions';
